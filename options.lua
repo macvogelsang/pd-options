@@ -16,7 +16,7 @@ local dividerWidth <const> = 1
 
 local KEY_REPEAT = 50
 local KEY_REPEAT_INITIAL = 250
-local TOGGLE, SLIDER = 1, 2
+local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
 local TOGGLE_VALS = {false, true}
 
 local optionDefinitions = {
@@ -33,8 +33,9 @@ local optionDefinitions = {
             {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
             {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the rest of the list when changed for a better look at the scene behind it', canFavorite=true},
             {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not'},
-            {name='X offset', key='xOffset',min=-2, max=2, default=0, style=SLIDER, dirtyRead=true},
-            {name='Y offset', key='yOffset',min=-5, max=5, default=0, style=SLIDER, dirtyRead=true}
+            {name='X offset', key='xOffset', min=-2, max=2, default=0, style=SLIDER, dirtyRead=true},
+            {name='Y offset', key='yOffset', min=-5, max=5, default=0, style=SLIDER, dirtyRead=true},
+            {name='Reset to defaults', key='RESET'}
         }
     }
 }
@@ -102,7 +103,7 @@ function Options:init()
             elseif style == SLIDER then
                 Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal)
                 print(val)
-            else
+            elseif style ~= RESET then
                 -- draw value as text
                 local optionWidth = 192 - (labelWidth+textPadding)
                 if isFavorited then val = 'Ⓑ' .. val end
@@ -144,8 +145,7 @@ function Options:init()
 
         -- action
         AButtonDown = function()
-            -- self:toggleCurrentOption(1, true)
-            self:toggleFavorite()
+            self:handleAPress()
         end,
         BButtonDown = function()
             if self.previewMode then
@@ -189,9 +189,12 @@ function Options:menuInit()
     self.menu:setSelectedRow(1)
 end
 
-function Options:userOptionsInit()
-    local existingOptions = self:loadUserOptions()
-    self.foundSettings = existingOptions ~= nil
+function Options:userOptionsInit(ignoreUserOptions)
+    local existingOptions = nil
+    if not ignoreUserOptions then
+        existingOptions = self:loadUserOptions()
+    end
+    self.userOptions = {}
 
     -- Go through each defined option and see if an existing value was loaded
     for j, section in ipairs(optionDefinitions) do
@@ -203,6 +206,10 @@ function Options:userOptionsInit()
             end
             if option.style == TOGGLE then
                 option.values = TOGGLE_VALS
+            end
+            if option.key == RESET then
+                option.values = {1}
+                option.style = RESET
             end
             if option.style == SLIDER then
                 option.values = {}
@@ -298,7 +305,7 @@ function Options:resetKeyTimers()
     end
 end
 function Options:show()
-    -- SFX:play(SFX.kWipe)
+    self:playOpenSFX()
     self:setVisible(true)
     self.previewMode = false
     self:updateMenuImage()
@@ -308,7 +315,7 @@ function Options:show()
 end
 
 function Options:hide()
-    -- SFX:play(SFX.kWipeBack)
+    self:playCloseSFX()
     self:saveUserOptions()
     self:resetKeyTimers()
     pd.inputHandlers.pop()
@@ -489,9 +496,12 @@ function Options:getMusicFavorites()
     return playlistFavs
 end
 
-function Options:toggleFavorite()
+function Options:handleAPress()
     local option = self:getSelectedOption()
     -- toggle the option if can't be favorited
+    if option.key == RESET then
+        return self:resetToDefaults()
+    end
     if not option.favKey then
         return self:toggleCurrentOption(1, true)
     end
@@ -504,20 +514,22 @@ function Options:toggleFavorite()
             if fav ~= option.current then table.insert(newFavs, fav) end
         end
         self.userOptions[option.favKey] = newFavs
-        print('removed favorite')
     else -- add favorite
         table.insert(favList, option.current)
-        print('marked favorite')
     end
-    printTable(self.userOptions[option.favKey])
     self:updateImage()
+end
 
+function Options:resetToDefaults()
+    self:playResetSFX()
+    self:userOptionsInit(true)
+    self:updateImage()
 end
 
 function Options:toggleCurrentOption(incr, forceWrap)
     incr = incr or 1
     self:resetKeyTimers()
-    -- SFX:play(incr == -1 and SFX.kSelectionReverse or SFX.kSelection, true)
+    self:playSelectionSFX(incr == 1)
 
     local option = self:getSelectedOption()
     local key =  option.key
@@ -653,7 +665,7 @@ function Options:selectPreviousRow()
     self.menu:selectPreviousRow(true, false, false)
     local sect, row, col = self.menu:getSelection()
     self.menu:scrollCellToCenter(sect, row, col, false)
-    -- SFX:play(SFX.kSelectionReverse, true)
+    self:playSelectionSFX(false)
     self:updateImage()
 end
 
@@ -662,11 +674,14 @@ function Options:selectNextRow()
     self.menu:selectNextRow(true, false, false)
     local sect, row, col = self.menu:getSelection()
     self.menu:scrollCellToCenter(sect, row, col, false)
-    -- SFX:play(SFX.kSelection, true)
+    self:playSelectionSFX(true)
     self:updateImage()
 end
 
---------- STATIC METHODS ---------
+------------------------------------------
+--------- STATIC DRAWING METHODS ---------
+------------------------------------------
+
 function Options.drawSwitch(y, val, selected)
     local x <const> = 158
     local y <const> = y+8
@@ -774,3 +789,20 @@ function Options.drawBox(x, y, width, height, drawShadow)
 
     return drawShadow and shadow or rect
 end
+
+------------------------------------------
+-------- SOUND EFFECT PLACEHOLDERS -------
+------------------------------------------
+
+-- open the menu
+function Options:playOpenSFX() end
+
+-- close the menu
+function Options:playCloseSFX() end
+
+-- reset to defaults
+function Options:playResetSFX() end
+
+-- select item
+-- pass boolean true for forward selection, boolean false for reverse selection
+function Options:playSelectionSFX(isForward) end
