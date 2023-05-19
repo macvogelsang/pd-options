@@ -20,21 +20,40 @@ local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
 local TOGGLE_VALS = {false, true}
 
 local optionDefinitions = {
-    -- name (str): option's display name in menu
-    -- key (str): indentifier for the option in the userOptions table
+    -- name (required string): option's display name in menu
+    -- key (optional string): identifier for the option in the userOptions table json output (NEEDS TO BE UNIQUE)
         -- if key is not provided, lowercase name is used as the key
-    -- values (table): table of possible values. if boolean table, will draw as toggle switch
-    -- default (num): index of value that should be set as default
-    -- preview (bool): hide the options menu while the option is changing to more easily preview changes
-    -- dirtyRead (bool): if true, a read on this option returns nil if it hasn't changed. useful for event-driven updates
+        -- set the key to "RESET" to make a "reset to defaults" button
+    -- values (optional table): table of possible values. Only required for normal "List" style options.
+    -- style (optional enum: TOGGLE, SLIDER, or none): defines a special type of option. If omitted, this will be a normal "list" option.
+        -- For any of these special option types, the "values" field is not required as it is calculated automatically.
+        -- TOGGLE: boolean toggle switch. Values: {false, true}
+        -- SLIDER: used to select an integer in a range from min to max (useful for volume controls). Values: {min, ... , max}
+    -- default (optional number): index of the value that should be set as default. If omitted, the first item in the values list will be the default.
+        -- For a standard list option, make sure to use the index of the item you want in the list, not the item itself.
+        -- For a toggle switch, set default to 1 for false, 2 for true.
+        -- For a slider, the default is not an index but rather an actual integer value. So if your volume slider goes from 0 to 5, and you want to
+        -- start on max volume, set the default to 5 (as opposed to 6).
+    -- preview (optional boolean): hide the options menu while the option is changing to more easily preview the changes. B or scrolling off the option will end the preview mode.
+    -- dirtyRead (optional boolean): if true, reads on this option will return `nil` if the value hasn't changed from the last read. This is useful for expensive operations based on an option value. dirtyRead options can also be "force" read to ignore the dirty state (see main.lua example app).
+    -- tooltip (optional string): Show a tooltip box when the user is selecting an option for additional help
+    -- ignoreOnLoad (optional boolean): Ignore the stored value for this option when loading the game. useful for settings that you want to be temporary.
+    -- locks (optional table): A table detailing which option under which condition should be "locked" when this option is a certain value. Format:
+        -- lockedOption: key of the option to lock
+        -- lockedValue: index of the value to lock the above option to
+        -- lockedWhen: when the value of the locking option is equal to this, the lockedOption becomes locked. Use indexes for every option style except TOGGLE, in which case use booleans.
+    -- canFavorite (optional boolean): Sets whether or not an option value can be "favorited" by pressing A on the value.
+        -- If favorite-able, an option value can be toggled as favorite with the A button
+        -- If any values favorited, only those are selected from for Opts:randomize()
+        -- It's up to you what else to do with the favorite values. You can access them with Opts:getFavorites(key). The resulting list is is a list of indexes for the option.values array.
     {
         header = 'Options Demo',
         options = {
             {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
             {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the rest of the list when changed for a better look at the scene behind it', canFavorite=true},
-            {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not'},
+            {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
             {name='X offset', key='xOffset', min=-2, max=2, default=0, style=SLIDER, dirtyRead=true},
-            {name='Y offset', key='yOffset', min=-5, max=5, default=0, style=SLIDER, dirtyRead=true},
+            {name='Y offset', key='yOffset', min=0, max=10, default=0, style=SLIDER, dirtyRead=true},
             {name='Reset to defaults', key='RESET'}
         }
     }
@@ -102,12 +121,11 @@ function Options:init()
                 Options.drawSwitch(y+textPadding-2, val, selected)
             elseif style == SLIDER then
                 Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal)
-                print(val)
             elseif style ~= RESET then
                 -- draw value as text
                 local optionWidth = 192 - (labelWidth+textPadding)
-                if isFavorited then val = 'Ⓑ' .. val end
-                gfx.drawTextInRect('*'..val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
+                if isFavorited then val = '❤️*' .. val else val = '*' .. val end
+                gfx.drawTextInRect(val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
             end
         end
 
@@ -216,8 +234,13 @@ function Options:userOptionsInit(ignoreUserOptions)
                 for i=option.min, option.max, 1 do
                     table.insert(option.values, i)
                 end
-                -- add one to the default because default needs to be an index into the values, not a value itself. although it defined as a value itself
-                option.default = table.indexOfElement(option.values, option.default or 1)
+
+                if option.default == nil then option.default = 1 end
+                -- when first loading this option, adjust the default to be an index rather than actual value
+                if not option.defaultAdjusted then
+                    option.default = table.indexOfElement(option.values, option.default)
+                    option.defaultAdjusted = true
+                end
             end
             if option.locks then
                 lockRelations[key] = option.locks
@@ -371,8 +394,9 @@ function Options:getValue(section, row)
     return option.values[option.current], isFavorited
 end
 
--- Returns the value of the option if it is marked as dirty, otherwise return nil
+-- Returns the index of the option's value if it is marked as dirty, otherwise return nil
 -- Pass ignoreDirty=true to always read the value of the option
+-- Pass retrunValue=true to return the actual value instead of the index
 function Options:read(key, ignoreDirty, returnValue)
     local opt = self.userOptions[key]
     if opt == nil then return opt end
@@ -435,23 +459,16 @@ function Options:markClean()
     self.dirty = false
 end
 
-function Options:randomize(kind, dontSave)
+-- Given a table of option keys, randomize the value of those options and write the result.
+-- If favorite values are set, randomizer only pulls from favorites.
+function Options:randomize(keyList)
     local randomizableOpts = {}
-    if kind == 'all' then
-        randomizableOpts = {musicOpt, bgOpt, tilesetOpt}
-    elseif kind == 'music+bg' then
-        randomizableOpts = {musicOpt, bgOpt}
-    elseif  kind == 'music' then
-        randomizableOpts = {musicOpt}
-    elseif kind == 'background' or kind == 'bg' then
-        randomizableOpts = {bgOpt}
-    elseif kind == 'tileset' then
-        randomizableOpts = {tilesetOpt}
-    elseif kind == 'tileset+bg' then
-        randomizableOpts = {tilesetOpt, bgOpt}
-    else
-        return
+    for i, key in ipairs(keyList) do
+        if optionDefsByKey[key] ~= nil then
+            table.insert(randomizableOpts, optionDefsByKey[key])
+        end
     end
+    if #randomizableOpts == 0 then return end
 
     for i, opt in ipairs(randomizableOpts) do
         local vals = opt.values
@@ -462,19 +479,12 @@ function Options:randomize(kind, dontSave)
             local favList = self.userOptions[opt.favKey]
             newIdx = favList[math.random(1, #favList)]
         else
-            if opt.key == 'music' then
-                newIdx = math.random(3, #vals)
-            else
-                newIdx = math.random(1, #vals)
-            end
+            newIdx = math.random(1, #vals)
         end
-
-        -- only return a random item (used in music player to get random bg images)
-        if dontSave then return newIdx end
 
         self.userOptions[opt.key] = {newIdx}
         if opt.dirtyRead then
-            self.userOptions[opt.key][2] = (newIdx ~= currentIdx) or opt.key == 'music'
+            self.userOptions[opt.key][2] = (newIdx ~= currentIdx)
         end
 
         opt.current = newIdx
@@ -483,17 +493,13 @@ function Options:randomize(kind, dontSave)
     self:updateImage()
 end
 
-function Options:getMusicFavorites()
-    local favs = self.userOptions['musicFavorites']
-    if #favs == 0 then return nil end
-    table.shuffle(favs)
-    local playlistFavs = {}
-    for i, fav in ipairs(favs) do
-        if fav > 2 then
-            table.insert(playlistFavs, fav - 2)
-        end
+function Options:getFavorites(key)
+    local opt = optionDefsByKey[key]
+    if opt.favKey then
+        local favs = self.userOptions[opt.favKey]
+        return favs
     end
-    return playlistFavs
+    return {}
 end
 
 function Options:handleAPress()
@@ -719,24 +725,25 @@ function Options.drawSwitch(y, val, selected)
     gfx.popContext()
 end
 
-function Options.drawSlider(y, val, selected, numValues, minVal)
-    -- val: integer between min and max in the definition (inclusive)
+function Options.drawSlider(y, rawVal, selected, numValues, minVal)
+    -- rawVal: integer between min and max in the definition (inclusive)
     -- numValues: how many possible values (max - min + 1)
     -- minVal: minimum end of the range
 
-    local x <const> = 113
+    local rightEdge <const> = 190
     local y <const> = y+8
 
     local r <const> = 6
-    local rx <const> = x+9
+    local rw <const> = numValues * 5 + 12
+    local rx <const> = rightEdge - rw
     local ry <const> = y-5
-    local rw <const> = 69
     local rh <const> = r*2+2
 
     -- adjust val to be between 1 and numValues
-    val = val + (1 - minVal)
-    local cx <const> = x + 11
-    local cxv <const> = cx+(val*5)
+    val = rawVal + (1 - minVal)
+    gfx.drawText(rawVal .. ','.. val, rx - 30, ry)
+    local cx <const> = rx
+    local cxv <const> = cx+(val*5)-1
     local cy <const> = y-6
 
     gfx.pushContext()
@@ -752,7 +759,7 @@ function Options.drawSlider(y, val, selected, numValues, minVal)
 
         -- notches
         for dot=1,numValues do
-            gfx.fillRect(cx-1+(dot*5),cy+7,2,2)
+            gfx.fillRect(cx+3+(dot*5),cy+7,2,2)
         end
 
         -- handle

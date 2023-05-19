@@ -2,9 +2,12 @@ local pd <const> = playdate
 local gfx <const> = pd.graphics
 pd.display.setRefreshRate(0)
 
+-- Import and initialize a global Options class -----
 import 'options'
 Opts = Options()
+----------------------------------------------
 
+-- Setup variables for the test app, can ignore this stuff ------
 local patterns = {gfx.image.kDitherTypeNone, gfx.image.kDitherTypeBayer4x4, gfx.image.kDitherTypeVerticalLine}
 local bgSprite = nil
 local shapes = {}
@@ -16,11 +19,17 @@ local textSprite = gfx.sprite.new(textImg)
 textSprite:moveTo(10, 210)
 textSprite:setCenter(0,0)
 textSprite:add()
+-----------------------------------------------------------------
 
+-- Controls for the test app. The options class has its own self-contained input handlers which you shouldn't need to worry about.
 local controls = {
     -- A button to show options
     AButtonDown = function()
         Opts:show()
+    end,
+    -- Up button to demonstrate "randomizer" method.
+    upButtonDown = function()
+        Opts:randomize({'bg', 'bFunction'})
     end,
     -- B button function is flexible depending on current setting
     BButtonDown = function()
@@ -28,9 +37,14 @@ local controls = {
         -- pass true here to "force" a read, even if the option is not dirty
         local outlined = Opts:read('outlined', true)
 
-        -- Read the current b button function
+        -- Read the current b button function. No force read necessary since this is not a
+        -- "dirtyRead" option.
         local bfn = Opts:read('bFunction')
 
+        -- Note that by default, reads return an index not a value. So we check for that index here.
+        -- It may be helpful to define these as global constants in your Lua project.
+        -- i.e. BFN_CIRCLE, BFN_SQUARE, BFN_CLEAR = 1, 2, 3
+        -- The rest of this code is logic to draw the different shapes based on the option values. You can ignore it.
         if bfn == 3 then -- clear all shapes
             for i, shape in ipairs(shapes) do
                 shape:remove()
@@ -73,12 +87,12 @@ local controls = {
 }
 pd.inputHandlers.push(controls)
 
+-- Background drawing function
 function setBackground(bgIndex)
     local bgImg = gfx.image.new(400, 240, gfx.kColorWhite)
     gfx.pushContext(bgImg)
         gfx.setColor(gfx.kColorBlack)
         gfx.setDitherPattern(0.5, patterns[bgIndex])
-        print('bgIndex', bgIndex)
         gfx.fillRect(0, 0, 400, 240)
     gfx.popContext()
 
@@ -86,8 +100,10 @@ function setBackground(bgIndex)
     bgsprite = gfx.sprite.setBackgroundDrawingCallback(function() bgImg:draw(0,0) end)
 end
 
+-- Shape offsetting function
 function offsetShapes(byX, byY)
-    -- For any offset that is nil, force a read of its current value ignoring the dirty flag.
+    -- When an offset slider is changed, the other slider value will be nil since it hasn't
+    -- changed. We can force of a read of its current value by passing "true" as the second param.
     byX = byX or Opts:read('xOffset', true, true)
     byY = byY or Opts:read('yOffset', true, true)
 
@@ -98,6 +114,7 @@ function offsetShapes(byX, byY)
 
 end
 
+-- Most of the logic for reading option values happens here
 function pd.update()
     -- Only change the background when the option value has changed (i.e. dirty)
     local newBg = Opts:read('bg')
@@ -105,19 +122,30 @@ function pd.update()
         setBackground(newBg)
     end
 
-    -- Only change the shape positions when one of the offsets is dirty.
-    -- Shouldn't do this every update since it may take a lot of time with many shapes.
+    -- Read the shape offset positions. Since the second arg is false (the default) and this is a
+    -- "dirtyRead" option, the result of the read will be nil if the value hasn't changed.
+    -- This prevents unnecessary updates since iterating through many shapes is expensive.
+    -- The third argument of "true" causes the read call to return the value of the slider,
+    -- not the index into the slider values. We want to do math on the value, not the index.
     local xOffset = Opts:read('xOffset', false, true)
     local yOffset = Opts:read('yOffset', false, true)
     if xOffset ~= nil or yOffset ~= nil then
         offsetShapes(xOffset, yOffset)
     end
 
+    -- Debug/Example logic to print the current user settings to console after any change
+    if Opts:isOptsDirty() then
+        print("OPTIONS CHANGED:")
+        printTable(Opts.userOptions)
+        Opts:markClean()
+    end
+
     gfx.sprite.update()
 end
 
--- Example of adding options item to system menu
+-- Example of how to add an 'options' item to system menu
 pd.getSystemMenu():addMenuItem('options', function(value)
+    -- Check current state of options sprite to determine whether to open or close the menu.
     if Opts:isVisible(true) then
         Opts:hide()
     else
