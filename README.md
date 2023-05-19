@@ -2,6 +2,9 @@
 
 A simple to use and portable options class for the Playdate Lua SDK.
 
+![Screenshot of options menu](more-examples/screen.png)
+![Demo gif of options menu](more-examples/demo.gif)
+
 ## Features
 - Declarative option definition syntax
 - Easy to install portable class (no other dependencies!)

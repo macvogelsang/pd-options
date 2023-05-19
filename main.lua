@@ -1,6 +1,6 @@
 local pd <const> = playdate
 local gfx <const> = pd.graphics
-pd.display.setRefreshRate(0)
+pd.display.setRefreshRate(30)
 
 -- Import and initialize a global Options class -----
 import 'options'

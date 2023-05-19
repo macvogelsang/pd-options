@@ -1,7 +1,8 @@
 import 'CoreLibs/ui'
-import "CoreLibs/object"
-import "CoreLibs/graphics"
-import "CoreLibs/sprites"
+import 'CoreLibs/object'
+import 'CoreLibs/graphics'
+import 'CoreLibs/sprites'
+import 'CoreLibs/crank'
 
 local pd <const> = playdate
 local gfx <const> = pd.graphics
@@ -39,7 +40,7 @@ local optionDefinitions = {
         options = {
             -- Standard list style options.
             {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
-            {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the rest of the list when changed for a better look at the scene behind it', canFavorite=true},
+            {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the menu when changed for a better look at the scene behind it', canFavorite=true},
             -- Toggle switch option. No values necessary. This option also locks the Background option.
             {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
             -- Slider option examples. No values are supplied, instead pass a min and max. Must use ints and the range is inclusive. No limit on size of range but visually it may look weird at 20 or more values.
