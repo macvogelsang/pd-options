@@ -8,18 +8,22 @@ local gfx <const> = pd.graphics
 
 class('Options').extends(gfx.sprite)
 
+-- You can change this stuff
+local KEY_REPEAT = 50 -- time between key repeats when scrolling
+local KEY_REPEAT_INITIAL = 250 -- initial delay before key repeating starts
+local DISPLAY_ON_RIGHT = true -- set to true to display the options on the right side of the screen instead
+
+-- Probably no need to change this stuff
 local timer <const> = pd.timer
-local itemHeight <const> = 24
 local w <const> = 200	--198
 local h <const> = 240
-local dividerWidth <const> = 1
-
-local KEY_REPEAT = 50
-local KEY_REPEAT_INITIAL = 250
 local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
 local TOGGLE_VALS = {false, true}
+local DIVIDER_WIDTH <const> = 1
+local ITEM_HEIGHT <const> = 24
+local X_OFFSET = DISPLAY_ON_RIGHT and 200 or 0
 
-local optionDefinitions = {
+-- Define the list of options declaratively. Each option must fall within a section header.
     -- name (required string): option's display name in menu
     -- key (optional string): identifier for the option in the userOptions table json output (NEEDS TO BE UNIQUE)
         -- if key is not provided, lowercase name is used as the key
@@ -46,14 +50,22 @@ local optionDefinitions = {
         -- If favorite-able, an option value can be toggled as favorite with the A button
         -- If any values favorited, only those are selected from for Opts:randomize()
         -- It's up to you what else to do with the favorite values. You can access them with Opts:getFavorites(key). The resulting list is is a list of indexes for the option.values array.
+    -- showValue (optional boolean): For SLIDER styles only: shows the current value of the slider to the right of the slider
+local optionDefinitions = {
     {
         header = 'Options Demo',
         options = {
+            -- Standard list style options.
             {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
             {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the rest of the list when changed for a better look at the scene behind it', canFavorite=true},
+            -- Toggle switch option. No values necessary. This option also locks the Background option.
             {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
-            {name='X offset', key='xOffset', min=-2, max=2, default=0, style=SLIDER, dirtyRead=true},
-            {name='Y offset', key='yOffset', min=0, max=10, default=0, style=SLIDER, dirtyRead=true},
+            -- Slider option examples. No values are supplied, instead pass a min and max. Must use ints and the range is inclusive. No limit on size of range but visually it may look weird at 20 or more values.
+            -- If you want to select between a lot of numbers, want a greater than 1 step size, or want float values, use a list option instead.
+            -- The default in this case is NOT an index like in all other styles. Instead it is a value within the range.
+            {name='X offset', key='xOffset', min=-2, max=2, default=0, style=SLIDER, dirtyRead=true, showValue=true},
+            {name='Y offset', key='yOffset', min=0, max=10, default=0, style=SLIDER, dirtyRead=true, showValue=true},
+            -- Example of reset button. Name can be whatever but key must be "RESET"
             {name='Reset to defaults', key='RESET'}
         }
     }
@@ -71,7 +83,7 @@ function Options:init()
     Options.super.init(self)
 
     self.frame = 1
-    self.menu = pd.ui.gridview.new(0, itemHeight)
+    self.menu = pd.ui.gridview.new(0, ITEM_HEIGHT)
 
     -- list of available options based on option screen (indexed by section/row for easy selection)
     self.currentOptions = {}
@@ -98,9 +110,9 @@ function Options:init()
     function self.menu.drawCell(menuSelf, section, row, column, selected, x, y, width, height)
         local textPadding = 5
         local val, isFavorited = self:getValue(section, row)
-        local label, style, numValues, minVal = self:getOptionDefInfo(section, row)
+        local label, style, numValues, minVal, showValue = self:getOptionDefInfo(section, row)
         if self.previewMode and not selected then return end
-
+        print(x, y, width, height)
         gfx.pushContext()
         if selected then
             gfx.setColor(gfx.kColorBlack)
@@ -109,18 +121,18 @@ function Options:init()
         else
             gfx.setImageDrawMode(gfx.kDrawModeCopy)
         end
-        -- draw option
-        -- gfx.setFont(font)
+
+        -- draw option label
         local labelWidth, _ = gfx.getTextSize(label)
         labelWidth = math.min(width, labelWidth)
         gfx.drawTextInRect(label, x+textPadding, y+textPadding, labelWidth, height, nil, '...', kTextAlignment.left)
 
-        -- draw switch as glyph
+        -- draw option value
         if val ~= 'n/a' and val ~= nil then
             if style == TOGGLE then
                 Options.drawSwitch(y+textPadding-2, val, selected)
             elseif style == SLIDER then
-                Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal)
+                Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal, showValue)
             elseif style ~= RESET then
                 -- draw value as text
                 local optionWidth = 192 - (labelWidth+textPadding)
@@ -200,7 +212,7 @@ function Options:menuInit()
 
     self.menu:setCellPadding(0,0,2,2)
     self.menu:setContentInset(4, 4, 0, 0)
-    self.menu:setSectionHeaderHeight(itemHeight)
+    self.menu:setSectionHeaderHeight(ITEM_HEIGHT)
     self.menu:setSectionHeaderPadding(0, 0, 2, 0)
 
     self.menu:setNumberOfRows(table.unpack(sectionRows))
@@ -382,7 +394,7 @@ function Options:getOptionDefInfo(section, row)
     local bold <const> = active and '' or ''
     gfx.setFontTracking(0)
     local optDef = self:getSelectedOption(section, row)
-    return bold..optDef.name, optDef.style, #optDef.values, optDef.min
+    return bold..optDef.name, optDef.style, #optDef.values, optDef.min, optDef.showValue
 end
 
 function Options:getValue(section, row)
@@ -396,7 +408,7 @@ end
 
 -- Returns the index of the option's value if it is marked as dirty, otherwise return nil
 -- Pass ignoreDirty=true to always read the value of the option
--- Pass retrunValue=true to return the actual value instead of the index
+-- Pass returnValue=true to return the actual value instead of the index
 function Options:read(key, ignoreDirty, returnValue)
     local opt = self.userOptions[key]
     if opt == nil then return opt end
@@ -421,6 +433,7 @@ function Options:read(key, ignoreDirty, returnValue)
     end
 end
 
+-- Write a new index to a given option key. Pass keepClean=true if you want to not mark this change as dirty.
 function Options:write(key, newIdx, keepClean)
     self:setOptionIdx(key, newIdx, optionDefsByKey[key], keepClean)
     self:updateImage()
@@ -601,17 +614,15 @@ function Options:updateImage()
     local img = self:getImage()
     img:clear(gfx.kColorClear)
     gfx.pushContext(img)
-    -- gfx.setFont(ST_DIN, 'normal')
-    -- gfx.setFont(ST_DIN_BOLD, 'bold')
-    if self.slideAnim then
-        local value = self.slideAnim.currentStage.value
-        self:drawSideBar(value)
-        self:drawMenu(value)
-    elseif not self.previewMode then
+
+    if not self.previewMode then
 
         self:updateMenuImage()
-        self:drawSideBar(w)
-        self:drawMenu(w)
+
+        self:drawSideBar()
+
+        -- xoffset is a parameter for this methods in case you want to animate the drawing left or right
+        self:drawMenu(0)
 
         local tooltip = self:getSelectedOption().tooltip
         if tooltip then
@@ -619,7 +630,7 @@ function Options:updateImage()
         end
     else
         self:updateMenuImage()
-        self:drawMenu(w)
+        self:drawMenu(0)
     end
 
     gfx.popContext()
@@ -633,22 +644,26 @@ function Options:updateMenuImage()
     gfx.popContext()
 end
 
-function Options:drawSideBar(width)
+function Options:drawSideBar()
     gfx.setColor(gfx.kColorWhite)
-    gfx.fillRect(0, 0, width, 240)
+    gfx.fillRect(X_OFFSET, 0, w, 240)
     gfx.setColor(gfx.kColorBlack)
     gfx.setLineWidth(2)
-    gfx.drawLine(width,0,width,240)
+    gfx.drawLine(w,0,w,240)
 end
 
-function Options:drawMenu(width)
-    local menuXOffset = -w + width
+function Options:drawMenu(xoffset)
+    local menuXOffset = xoffset + X_OFFSET
     self.menuImg:draw(menuXOffset, 0)
 end
 
 function Options:drawTooltipBox(tooltip)
     local textPadding = 10
-    local x, y = w + dividerWidth + 18, 30
+    local distanceFromDivider = 18
+    local x, y = w + DIVIDER_WIDTH + distanceFromDivider, 20
+    if DISPLAY_ON_RIGHT then
+        x = distanceFromDivider
+    end
     local maxWidth = 160
     local maxHeight = 180
 
@@ -689,7 +704,8 @@ end
 ------------------------------------------
 
 function Options.drawSwitch(y, val, selected)
-    local x <const> = 158
+    local x = 158
+
     local y <const> = y+8
 
     local r <const> = 6
@@ -725,12 +741,13 @@ function Options.drawSwitch(y, val, selected)
     gfx.popContext()
 end
 
-function Options.drawSlider(y, rawVal, selected, numValues, minVal)
+function Options.drawSlider(y, rawVal, selected, numValues, minVal, showValue)
     -- rawVal: integer between min and max in the definition (inclusive)
     -- numValues: how many possible values (max - min + 1)
     -- minVal: minimum end of the range
 
-    local rightEdge <const> = 190
+    local rightEdge = 190
+
     local y <const> = y+8
 
     local r <const> = 6
@@ -741,7 +758,9 @@ function Options.drawSlider(y, rawVal, selected, numValues, minVal)
 
     -- adjust val to be between 1 and numValues
     val = rawVal + (1 - minVal)
-    gfx.drawText(rawVal .. ','.. val, rx - 30, ry)
+    if showValue then
+        gfx.drawTextAligned(rawVal, rx - 5, ry-1, kTextAlignment.right)
+    end
     local cx <const> = rx
     local cxv <const> = cx+(val*5)-1
     local cy <const> = y-6
@@ -787,12 +806,12 @@ function Options.drawBox(x, y, width, height, drawShadow)
 
      -- background
      gfx.setColor(gfx.kColorWhite)
-     gfx.fillRect(rect)
+     gfx.fillRoundRect(rect, 4)
 
      -- border
      gfx.setColor(gfx.kColorBlack)
      gfx.setLineWidth(2)
-     gfx.drawRect(rect)
+     gfx.drawRoundRect(rect, 4)
 
     return drawShadow and shadow or rect
 end
