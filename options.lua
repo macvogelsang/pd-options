@@ -9,19 +9,25 @@ local gfx <const> = pd.graphics
 class('Options').extends(gfx.sprite)
 
 -- You can change this stuff
-local KEY_REPEAT = 50 -- time between key repeats when scrolling
-local KEY_REPEAT_INITIAL = 250 -- initial delay before key repeating starts
-local DISPLAY_ON_RIGHT = true -- set to true to display the options on the right side of the screen instead
+-- Option selection key repeat values
+local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
+local UP_DOWN_KEY_REPEAT_INITIAL = 250 -- initial delay before key repeating starts
+-- Value selection key repeat values (these are slower by default because some value changing operations can be expensive)
+local LEFT_RIGHT_KEY_REPEAT = 150
+local LEFT_RIGHT_KEY_REPEAT_INITIAL = 250
 
--- Probably no need to change this stuff
+-- Set to true to display the options on the right side of the screen instead
+local DISPLAY_ON_RIGHT = false
+
+-- Probably no need to change this stuff unless you want more custom drawing styles
 local timer <const> = pd.timer
 local w <const> = 200	--198
 local h <const> = 240
-local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
-local TOGGLE_VALS = {false, true}
 local DIVIDER_WIDTH <const> = 1
 local ITEM_HEIGHT <const> = 24
 local X_OFFSET = DISPLAY_ON_RIGHT and 200 or 0
+local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
+local TOGGLE_VALS = {false, true}
 
 -- Define the list of options declaratively. Each option must fall within a section header.
     -- name (required string): option's display name in menu
@@ -112,7 +118,6 @@ function Options:init()
         local val, isFavorited = self:getValue(section, row)
         local label, style, numValues, minVal, showValue = self:getOptionDefInfo(section, row)
         if self.previewMode and not selected then return end
-        print(x, y, width, height)
         gfx.pushContext()
         if selected then
             gfx.setColor(gfx.kColorBlack)
@@ -162,16 +167,22 @@ function Options:init()
     self.keyTimer = {}
     self.controls = {
         -- move
-        leftButtonDown = function() self:toggleCurrentOption(-1) end,
-        rightButtonDown = function() self:toggleCurrentOption(1) end,
+        leftButtonDown = function()
+            self.keyTimer.L = timer.keyRepeatTimerWithDelay(LEFT_RIGHT_KEY_REPEAT_INITIAL, LEFT_RIGHT_KEY_REPEAT, function() self:toggleCurrentOption(-1) end)
+        end,
+        leftButtonUp = function() if self.keyTimer.L then self.keyTimer.L:remove() end end,
+        rightButtonDown = function()
+            self.keyTimer.R = timer.keyRepeatTimerWithDelay(LEFT_RIGHT_KEY_REPEAT_INITIAL, LEFT_RIGHT_KEY_REPEAT, function() self:toggleCurrentOption(1) end)
+        end,
+        rightButtonUp = function() if self.keyTimer.R then self.keyTimer.R:remove() end end,
         upButtonDown = function()
-            self.keyTimer['U'] = timer.keyRepeatTimerWithDelay(KEY_REPEAT_INITIAL, KEY_REPEAT, function() self:selectPreviousRow() end)
+            self.keyTimer.U = timer.keyRepeatTimerWithDelay(UP_DOWN_KEY_REPEAT_INITIAL, UP_DOWN_KEY_REPEAT, function() self:selectPreviousRow() end)
         end,
-        upButtonUp = function() if self.keyTimer['U'] then self.keyTimer['U']:remove() end end,
+        upButtonUp = function() if self.keyTimer.U then self.keyTimer.U:remove() end end,
         downButtonDown = function()
-            self.keyTimer['D'] = timer.keyRepeatTimerWithDelay(KEY_REPEAT_INITIAL, KEY_REPEAT, function() self:selectNextRow() end)
+            self.keyTimer.D = timer.keyRepeatTimerWithDelay(UP_DOWN_KEY_REPEAT_INITIAL, UP_DOWN_KEY_REPEAT, function() self:selectNextRow() end)
         end,
-        downButtonUp = function() if self.keyTimer['D'] then self.keyTimer['D']:remove() end end,
+        downButtonUp = function() if self.keyTimer.D then self.keyTimer.D:remove() end end,
 
         -- action
         AButtonDown = function()
@@ -334,9 +345,11 @@ function Options:loadUserOptions()
     return pd.datastore.read('settings')
 end
 
-function Options:resetKeyTimers()
+function Options:resetKeyTimers(upDownOnly)
     for k, v in pairs(self.keyTimer) do
-        v:remove()
+        if not upDownOnly or k == 'U' or k == 'D' then
+            v:remove()
+        end
     end
 end
 function Options:show()
@@ -547,7 +560,7 @@ end
 
 function Options:toggleCurrentOption(incr, forceWrap)
     incr = incr or 1
-    self:resetKeyTimers()
+    self:resetKeyTimers(true)
     self:playSelectionSFX(incr == 1)
 
     local option = self:getSelectedOption()

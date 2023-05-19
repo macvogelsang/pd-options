@@ -14,7 +14,7 @@ local shapes = {}
 local SHAPE_MAX_SIZE = 40
 local SHAPE_MID = SHAPE_MAX_SIZE / 2
 
-local textImg = gfx.imageWithText("*Press A to open Options*", 210, 30, gfx.kColorWhite, nil, nil, kTextAlignment.left)
+local textImg = gfx.imageWithText(" Press Ⓐ to open Options, Ⓑ to do function. ", 400, 30, gfx.kColorWhite, nil, nil, kTextAlignment.left)
 local textSprite = gfx.sprite.new(textImg)
 textSprite:moveTo(10, 210)
 textSprite:setCenter(0,0)
@@ -141,6 +141,7 @@ function pd.update()
     end
 
     gfx.sprite.update()
+    playdate.timer.updateTimers()
 end
 
 -- Example of how to add an 'options' item to system menu
