@@ -1,3 +1,6 @@
+--
+--  pd-options - Robust and portable options manager class for the Playdate Lua SDK
+--
 import 'CoreLibs/ui'
 import 'CoreLibs/object'
 import 'CoreLibs/graphics'

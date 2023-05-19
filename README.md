@@ -18,11 +18,18 @@ A simple to use and portable options class for the Playdate Lua SDK.
 
 ## Installation
 
+### Option A: Copy manually
 1. Copy the `options.lua` file into your project's Source folder.
 2. `import 'path/to/options'` in your `main.lua` file
-3. Initialize the Options class a global variable. EX: `Opts = Options()`, and make sure
-`gfx.sprite.update()` and `playdate.timer.updateTimers()` are called in your main update loop.
-4. Done!
+
+### Option B: With [toybox](https://github.com/DidierMalenfant/toybox.py)
+1. Run `toybox add options` and `toybox update`
+2. Make sure all toyboxes are imported in your code: `import '../toyboxes/toyboxes.lua`
+
+### Regardless of option above, initialize the class:
+1. Initialize the Options class a global variable. EX: `Opts = Options()`
+2. Ensure `gfx.sprite.update()` and `playdate.timer.updateTimers()` are called in your main update loop.
+3. Done!
 
 ## Demo
 
