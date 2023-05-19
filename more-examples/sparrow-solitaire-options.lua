@@ -1,71 +1,126 @@
-import 'CoreLibs/ui'
-import "CoreLibs/object"
-import "CoreLibs/graphics"
-import "CoreLibs/sprites"
-
 local pd <const> = playdate
 local gfx <const> = pd.graphics
+local Ease <const> = pd.easingFunctions
 
 class('Options').extends(gfx.sprite)
 
--- You can change this stuff
--- Option selection key repeat values
-local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
-local UP_DOWN_KEY_REPEAT_INITIAL = 250 -- initial delay before key repeating starts
--- Value selection key repeat values (these are slower by default because some value changing operations can be expensive)
-local LEFT_RIGHT_KEY_REPEAT = 150
-local LEFT_RIGHT_KEY_REPEAT_INITIAL = 250
--- Set to true to display the options on the right side of the screen instead
-local DISPLAY_ON_RIGHT = false
--- File path of the output user settings in game data folder
-local SAVED_DATA_PATH = 'settings'
-
-
--- Probably no need to change this stuff unless you want more custom drawing styles
 local timer <const> = pd.timer
+local itemHeight <const> = 24
 local w <const> = 200	--198
 local h <const> = 240
-local DIVIDER_WIDTH <const> = 1
-local ITEM_HEIGHT <const> = 24
-local X_OFFSET = DISPLAY_ON_RIGHT and 200 or 0
-local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
-local TOGGLE_VALS = {false, true}
+local dividerWidth <const> = 1
 
--- Define the list of options declaratively. Each option must fall within a section header.
--- See README.md for details on fields.
-local optionDefinitions = {
+local KEY_REPEAT_INITIAL = KEY_REPEAT_INITIAL
+local KEY_REPEAT = KEY_REPEAT
+local TOGGLE, SLIDER = 1, 2
+local TOGGLE_VALS = {false, true}
+AUTO_SELECT_VALS = {'none', 'bg', 'tileset', 'tileset+bg', 'music', 'music+bg', 'all'}
+AUTO_PLAY_VALS = {'off', 'sequence', 'shuffle'}
+INDICATORS = {'tiles remaining', 'time', 'none'}
+BBUTTON_VALS = {'default', 'tileset', 'bg', 'tileset+bg'}
+WEATHER_VALS = {'rain', 'snow', 'petals', 'off', 'with music'}
+MUSIC = {
+    {name='off'},
+    {name='cursor sounds'},
+    {name='herbal remedies', key='kTitleIntro'},
+    {name='in a dream', key='kDream'},
+    {name='nekoneteru', key='kNekoneteru'},
+    {name='nostalgic', key='kNostalgic'},
+    {name='rosa', key='kRosaIntro'},
+    {name='save', key='kSave'},
+    {name='small universe', key='kSmallUniverse'},
+    {name='snow blossoms', key='kCherryBlossoms'},
+    {name='starry dish', key='kStarryIntro'},
+}
+MUSIC_OPTS = {} -- complete list of options to select from
+PLAYLIST_SONGS = {} -- song options only
+for i, v in ipairs(MUSIC) do
+    table.insert(MUSIC_OPTS, v.name)
+    if v.key then
+        table.insert(PLAYLIST_SONGS, v.key)
+    end
+end
+
+local gameOptions = {
+    -- name (str): option's display name in menu
+    -- key (str): indentifier for the option in the userOptions table
+        -- if key is not provided, lowercase name is used as the key
+    -- values (table): table of possible values. if boolean table, will draw as toggle switch
+    -- default (num): index of value that should be set as default
+    -- preview (bool): hide the options menu while the option is changing to more easily preview changes
+    -- dirtyRead (bool): if true, a read on this option returns nil if it hasn't changed. useful for event-driven updates
     {
-        header = 'Options Demo',
+        header = 'Visuals',
         options = {
-            -- Standard list style options.
-            {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
-            {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the rest of the list when changed for a better look at the scene behind it', canFavorite=true},
-            -- Toggle switch option. No values necessary. This option also locks the Background option.
-            {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
-            -- Slider option examples. No values are supplied, instead pass a min and max. Must use ints and the range is inclusive. No limit on size of range but visually it may look weird at 20 or more values.
-            -- If you want to select between a lot of numbers, want a greater than 1 step size, or want float values, use a list option instead.
-            -- The default in this case is NOT an index like in all other styles. Instead it is a value within the range.
-            {name='X offset', key='xOffset', min=-2, max=2, default=0, style=SLIDER, dirtyRead=true, showValue=true},
-            {name='Y offset', key='yOffset', min=0, max=10, default=0, style=SLIDER, dirtyRead=true, showValue=true},
-            -- Example of reset button. Name can be whatever but key must be "RESET"
-            {name='Reset to defaults', key='RESET'}
+            {name='Tileset', values=TILESETS.names, default=1, preview=true, dirtyRead=true, tooltip='Pick one of many tile designs. Mark your favorites with the *A button*.', canFavorite=true},
+            {name='Background', values=BACKGROUNDS.names, default=10, preview=true, dirtyRead=true, tooltip='Pick one of the many backgrounds. Mark your favorites with the *A button*.', canFavorite=true},
+            {name='Invert Background', key='invertbg', style=TOGGLE, default=1, preview=true, dirtyRead=true},
+            {name='Random Theme', key='autoselect', values=AUTO_SELECT_VALS, default=1, tooltip='Randomize the music, background, tileset, or all three when switching to a new layout. The random selection comes from your favorites if any favorites are set.'},
+        }
+    },
+    {
+        header = 'Audio',
+        options = {
+            {name='Music', values=MUSIC_OPTS, default=3, dirtyRead=true, tooltip='Choose the music or turn it off. Mark your favorites (for shuffling) with the *A button*. The "cursor sounds" option is just for fun: it makes the sound effects more musical!', canFavorite=true},
+            {name='Autoplay', key='autoplay', values=AUTO_PLAY_VALS, default=2, dirtyRead=false, tooltip="Play a new song when one ends. The *shuffle* option picks from all the songs if no favorites are selected, otherwise only favorites are used."},
+            {name='Music Volume', key='musicvol', min=0, max=11, default=10, style=SLIDER, dirtyRead=true},
+            {name='Sound Volume', key='soundvol', min=0, max=11, default=10, style=SLIDER, dirtyRead=true}
+        }
+    },
+    {
+        header = 'Accessibility',
+        options = {
+            {name='Zoom 🔍', key='zoomfn', values={'off', 'with crank', 'with b button', 'always'}, default=1, tooltip='A 2x zoom can be toggled with the crank or B button. By default, the crank cycles through free tiles, and the B button deselects the selected tile.'},
+            {name='Preserve Zoom', key='maintainzoom', style=TOGGLE, default=1, tooltip='If on and the zoom mode is not already *always*, the previous zoom toggle state will be restored upon returning from a menu.'},
+            {name='Shade Blocked Tiles', key='blocked', style=TOGGLE, default=1, dirtyRead=true, tooltip='Greys out tiles that are blocked and unable to be selected.'},
+            {name='Ensure Solvable Deals', key='solvable', style=TOGGLE, default=2, tooltip="Generates solvable deals instead of purely random, at the expense of loading times. Shisen-sho layouts are not solved, and some user created layouts may not be solvable.", locks={lockedOption='dealstyle', lockedValue=2, lockedWhen=true}},
+            {name='Show Cursor Layer', key='cursorlayer', style=TOGGLE, default=1, dirtyRead=true, tooltip="Displays the current layer number on the cursor."}
+        }
+    },
+    {
+        header = 'Controls',
+        options = {
+            {name='Cursor Mode', key='cursor', values={'free tiles', 'all tiles', 'grid'}, default=3, dirtyRead=true, tooltip='The cursor can snap between free tiles only or all tiles. Disable snapping with grid mode. The two snapping options behave the same in shisen-sho.'},
+            {name='Cursor Wrap', key='wrap', style=TOGGLE, default=2, tooltip='In free tiles or all tiles snap mode, the cursor wraps around to valid tiles on the other side of the screen. Turning this off may reduce unexpected snaps.'},
+            -- {name='B button', key='bbuttonfn', values=BBUTTON_VALS, default=1, tooltip='This is a temporary b button override to randomize tilesets or backgrounds or both.'},
+            {name='Crank', key='crankfn2', values={'seek free tiles', 'undo/redo'}, default=1, tooltip="The default behavior of crank if not using zoom: find free tiles or undo/redo. Both functions can be done with the B button as well: tap B while holding a direction or hold B and tap a direction respectively."}
+        }
+    },
+    {
+        header = 'Miscellaneous',
+        options = {
+            {name='Deselect Both', key='autodeselect', style=TOGGLE, default=1, tooltip='If on, both tiles are deselected instead of only the most recent one after an invalid match.'},
+            {name='Deal Style', key='dealstyle', values={'all up', 'all down', 'top layer up'}, default=1, tooltip='Changes visibility of tile faces when they are being dealt to reduce peeking. This option is *locked* to "all down" if solvable deals is on.'},
+            {name='Indicator', key='indicator', values=INDICATORS, default=1, dirtyRead=true, tooltip="Change or remove the UI indicator in the top right corner."},
+            {name='Weather', key='weather', values=WEATHER_VALS, default=5, tooltip="Disable or set weather effects. The default, *with music*, links them to the currently playing song.", dirtyRead=false},
+            {name='Extend Music Loops', key='extendedplay', style=TOGGLE, default=1, tooltip="Songs will loop an extra time before the next song starts in autoplay mode."},
+            {name='Music Screensaver', key='musicplayer', style=TOGGLE, default=1, dirtyRead=true, tooltip="Features the background, current song name, and prevents the screen from locking. Best used with *shuffle* or *sequence* music autoplay modes.", ignoreOnLoad=true}
         }
     }
+    -- {
+    --     header = 'Debug',
+    --     options = {
+    --         {name='Deal Animation', key='animate', values=toggleVals, default=2},
+    --         {name='Allow Any Matches', key='anymatch', values=toggleVals, default=1},
+    --         {name='Save on Exit', key='save', values=toggleVals, default=2},
+    --     }
+    -- }
 }
 
-local musicOpt = optionDefinitions[1].options[1]
-local bgOpt =  optionDefinitions[1].options[1]
-local tilesetOpt = optionDefinitions[1].options[1]
+local musicOpt = gameOptions[2].options[1]
+local bgOpt =  gameOptions[1].options[2]
+local tilesetOpt = gameOptions[1].options[1]
 
+local editorOptions = {} -- unused
 local lockRelations = {} -- store for options that lock other options
 local lockedOptions = {} -- hash set of option keys that are currently locked from being altered
-local optionDefsByKey = {} -- transformation of the optionDefinitions object to be indexed by key. values point back to the option definition
+local optionDefsByKey = {} -- transformation of the gameOptions object to be indexed by key. values point back to the option definition
 
 function Options:init()
     Options.super.init(self)
 
     self.frame = 1
-    self.menu = pd.ui.gridview.new(0, ITEM_HEIGHT)
+    self.menu = pd.ui.gridview.new(0, itemHeight)
 
     -- list of available options based on option screen (indexed by section/row for easy selection)
     self.currentOptions = {}
@@ -75,7 +130,7 @@ function Options:init()
     self.previewMode = false
 
     -- sprite init
-    self:setZIndex(9999)
+    self:setZIndex(LAYERS.options)
     self:setIgnoresDrawOffset(true)
     self:setCenter(0,0)
     self:moveTo(0,0)
@@ -92,33 +147,36 @@ function Options:init()
     function self.menu.drawCell(menuSelf, section, row, column, selected, x, y, width, height)
         local textPadding = 5
         local val, isFavorited = self:getValue(section, row)
-        local label, style, numValues, minVal, showValue = self:getOptionDefInfo(section, row)
+        local label, style = self:getLabel(section, row)
         if self.previewMode and not selected then return end
+
         gfx.pushContext()
+        gfx.setFont(ST_DIN_BOLD, 'bold')
+        gfx.setFont(ST_DIN, 'normal')
         if selected then
             gfx.setColor(gfx.kColorBlack)
-            gfx.fillRoundRect(x, y, width, height+2, 4)
+            gfx.fillRect(x, y, width, height+2)
             gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
         else
             gfx.setImageDrawMode(gfx.kDrawModeCopy)
         end
-
-        -- draw option label
+        -- draw option
+        -- gfx.setFont(font)
         local labelWidth, _ = gfx.getTextSize(label)
         labelWidth = math.min(width, labelWidth)
         gfx.drawTextInRect(label, x+textPadding, y+textPadding, labelWidth, height, nil, '...', kTextAlignment.left)
 
-        -- draw option value
+        -- draw switch as glyph
         if val ~= 'n/a' and val ~= nil then
             if style == TOGGLE then
                 Options.drawSwitch(y+textPadding-2, val, selected)
             elseif style == SLIDER then
-                Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal, showValue)
-            elseif style ~= RESET then
+                Options.drawSlider(y+textPadding-2, val, selected)
+            else
                 -- draw value as text
                 local optionWidth = 192 - (labelWidth+textPadding)
-                if isFavorited then val = '❤️*' .. val else val = '*' .. val end
-                gfx.drawTextInRect(val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
+                if isFavorited then val = 'Ⓑ' .. val end
+                gfx.drawTextInRect('*'..val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
             end
         end
 
@@ -128,13 +186,15 @@ function Options:init()
     function self.menu.drawSectionHeader(menuSelf, section, x, y, width, height)
         if self.previewMode then return end
 
-        local textPadding = 4
+        local textPadding = 5
         local text = '*'..self.currentOptions[section].header:upper()..'*'
         gfx.pushContext()
             -- gfx.setImageDrawMode(gfx.kDrawModeCopy)
+            gfx.setFont(VANCOUVER_BOLD, 'bold')
             gfx.drawText(text, x+4, y+textPadding)
             gfx.setColor(gfx.kColorBlack)
             gfx.setLineWidth(2)
+            gfx.setDitherPattern(0.5, gfx.image.kDitherTypeBayer2x2)
             gfx.drawLine(x, y+height, x+width, y+height)
 
         gfx.popContext()
@@ -143,26 +203,21 @@ function Options:init()
     self.keyTimer = {}
     self.controls = {
         -- move
-        leftButtonDown = function()
-            self.keyTimer.L = timer.keyRepeatTimerWithDelay(LEFT_RIGHT_KEY_REPEAT_INITIAL, LEFT_RIGHT_KEY_REPEAT, function() self:toggleCurrentOption(-1) end)
-        end,
-        leftButtonUp = function() if self.keyTimer.L then self.keyTimer.L:remove() end end,
-        rightButtonDown = function()
-            self.keyTimer.R = timer.keyRepeatTimerWithDelay(LEFT_RIGHT_KEY_REPEAT_INITIAL, LEFT_RIGHT_KEY_REPEAT, function() self:toggleCurrentOption(1) end)
-        end,
-        rightButtonUp = function() if self.keyTimer.R then self.keyTimer.R:remove() end end,
+        leftButtonDown = function() self:toggleCurrentOption(-1) end,
+        rightButtonDown = function() self:toggleCurrentOption(1) end,
         upButtonDown = function()
-            self.keyTimer.U = timer.keyRepeatTimerWithDelay(UP_DOWN_KEY_REPEAT_INITIAL, UP_DOWN_KEY_REPEAT, function() self:selectPreviousRow() end)
+            self.keyTimer['U'] = timer.keyRepeatTimerWithDelay(KEY_REPEAT_INITIAL, KEY_REPEAT, function() self:selectPreviousRow() end)
         end,
-        upButtonUp = function() if self.keyTimer.U then self.keyTimer.U:remove() end end,
+        upButtonUp = function() if self.keyTimer['U'] then self.keyTimer['U']:remove() end end,
         downButtonDown = function()
-            self.keyTimer.D = timer.keyRepeatTimerWithDelay(UP_DOWN_KEY_REPEAT_INITIAL, UP_DOWN_KEY_REPEAT, function() self:selectNextRow() end)
+            self.keyTimer['D'] = timer.keyRepeatTimerWithDelay(KEY_REPEAT_INITIAL, KEY_REPEAT, function() self:selectNextRow() end)
         end,
-        downButtonUp = function() if self.keyTimer.D then self.keyTimer.D:remove() end end,
+        downButtonUp = function() if self.keyTimer['D'] then self.keyTimer['D']:remove() end end,
 
         -- action
         AButtonDown = function()
-            self:handleAPress()
+            -- self:toggleCurrentOption(1, true)
+            self:toggleFavorite()
         end,
         BButtonDown = function()
             if self.previewMode then
@@ -187,7 +242,7 @@ function Options:init()
 end
 
 function Options:menuInit()
-    self.currentOptions = optionDefinitions
+    self.currentOptions = (self.currentOptions == gameOptions) and editorOptions or gameOptions
 
     local sectionRows = {}
     local startRow = 0
@@ -199,22 +254,19 @@ function Options:menuInit()
 
     self.menu:setCellPadding(0,0,2,2)
     self.menu:setContentInset(4, 4, 0, 0)
-    self.menu:setSectionHeaderHeight(ITEM_HEIGHT)
+    self.menu:setSectionHeaderHeight(itemHeight)
     self.menu:setSectionHeaderPadding(0, 0, 2, 0)
 
     self.menu:setNumberOfRows(table.unpack(sectionRows))
     self.menu:setSelectedRow(1)
 end
 
-function Options:userOptionsInit(ignoreUserOptions)
-    local existingOptions = nil
-    if not ignoreUserOptions then
-        existingOptions = self:loadUserOptions()
-    end
-    self.userOptions = {}
+function Options:userOptionsInit()
+    local existingOptions = self:loadUserOptions()
+    self.foundSettings = existingOptions ~= nil
 
     -- Go through each defined option and see if an existing value was loaded
-    for j, section in ipairs(optionDefinitions) do
+    for j, section in ipairs(gameOptions) do
         for i, option in ipairs(section.options) do
             local key = option.key or option.name:lower()
             optionDefsByKey[key] = option
@@ -224,22 +276,13 @@ function Options:userOptionsInit(ignoreUserOptions)
             if option.style == TOGGLE then
                 option.values = TOGGLE_VALS
             end
-            if option.key == RESET then
-                option.values = {1}
-                option.style = RESET
-            end
             if option.style == SLIDER then
                 option.values = {}
                 for i=option.min, option.max, 1 do
                     table.insert(option.values, i)
                 end
-
-                if option.default == nil then option.default = 1 end
-                -- when first loading this option, adjust the default to be an index rather than actual value
-                if not option.defaultAdjusted then
-                    option.default = table.indexOfElement(option.values, option.default)
-                    option.defaultAdjusted = true
-                end
+                -- add one to the default because default needs to be an index into the values, not a value itself. although it defined as a value itself
+                option.default = option.default + 1 or option.min
             end
             if option.locks then
                 lockRelations[key] = option.locks
@@ -314,38 +357,54 @@ end
 
 function Options:saveUserOptions()
     self.userOptions._build = pd.metadata.buildNumber
-    pd.datastore.write(self.userOptions, path or SAVE_DATA_PATH, false)
+    pd.datastore.write(self.userOptions, 'settings', false)
 end
 
 function Options:loadUserOptions()
-    return pd.datastore.read(SAVE_DATA_PATH)
+    return pd.datastore.read('settings')
 end
 
-function Options:resetKeyTimers(upDownOnly)
+function Options:resetKeyTimers()
     for k, v in pairs(self.keyTimer) do
-        if not upDownOnly or k == 'U' or k == 'D' then
-            v:remove()
-        end
+        v:remove()
     end
 end
 function Options:show()
-    if self:isVisible() then return end
-
-    self:playOpenSFX()
+    SFX:play(SFX.kWipe)
+    Stats:pauseTimer()
     self:setVisible(true)
     self.previewMode = false
     self:updateMenuImage()
     pd.inputHandlers.push(self.controls, true)
+    if Debug.Logger then print("Options controls push") end
 
-    self:updateImage()
+    self.slideAnim = Utils.createTimerSequence(
+        {{300, -5, 200, Ease.outBack}},
+        function()
+            self.slideAnim = nil
+            self:updateImage()
+        end
+    )
 end
 
 function Options:hide()
-    self:playCloseSFX()
+    if DockScreenSaver and DockScreenSaver.active then DockScreenSaver:exit() end
+
+    Stats:resumeTimer()
     self:saveUserOptions()
     self:resetKeyTimers()
     pd.inputHandlers.pop()
-    self:setVisible(false)
+    if Debug.Logger then print("Options controls pop") end
+    SFX:play(SFX.kWipeBack)
+
+    self.slideAnim = Utils.createTimerSequence(
+        {{300, 200, -5, Ease.outBack}},
+        function()
+            self.slideAnim = nil
+            self:setVisible(false)
+            self:restoreZoom()
+        end
+    )
 end
 
 -- given an option key and a value, check if that setting should lock any other options from changing
@@ -380,12 +439,12 @@ function Options:getSelectedOption(section, row)
     return self.currentOptions[section].options[row]
 end
 
-function Options:getOptionDefInfo(section, row)
+function Options:getLabel(section, row)
     local active <const> = self:getValue(section, row) == nil
     local bold <const> = active and '' or ''
     gfx.setFontTracking(0)
     local optDef = self:getSelectedOption(section, row)
-    return bold..optDef.name, optDef.style, #optDef.values, optDef.min, optDef.showValue
+    return bold..optDef.name, optDef.style
 end
 
 function Options:getValue(section, row)
@@ -397,34 +456,27 @@ function Options:getValue(section, row)
     return option.values[option.current], isFavorited
 end
 
--- Returns the index of the option's value if it is marked as dirty, otherwise return nil
+-- Returns the value of the option if it is marked as dirty, otherwise return nil
 -- Pass ignoreDirty=true to always read the value of the option
--- Pass returnValue=true to return the actual value instead of the index
-function Options:read(key, ignoreDirty, returnValue)
+function Options:read(key, ignoreDirty)
     local opt = self.userOptions[key]
     if opt == nil then return opt end
-
-    local values = nil
-    if returnValue then
-        values = optionDefsByKey[key].values
-    end
 
     -- opt[1] is the value, opt[2] is a boolean indicating if the option is dirty.
     -- not all options are defined with dirty reads, and in that case they are only length 1
     if #opt == 2 and not ignoreDirty then
         if opt[2] then
             opt[2] = false
-            return returnValue and values[opt[1]] or opt[1]
+            return opt[1]
         end
     else
         if opt[2] then
             opt[2] = false
         end
-        return returnValue and values[opt[1]] or opt[1]
+        return opt[1]
     end
 end
 
--- Write a new index to a given option key. Pass keepClean=true if you want to not mark this change as dirty.
 function Options:write(key, newIdx, keepClean)
     self:setOptionIdx(key, newIdx, optionDefsByKey[key], keepClean)
     self:updateImage()
@@ -463,16 +515,23 @@ function Options:markClean()
     self.dirty = false
 end
 
--- Given a table of option keys, randomize the value of those options and write the result.
--- If favorite values are set, randomizer only pulls from favorites.
-function Options:randomize(keyList)
+function Options:randomize(kind, dontSave)
     local randomizableOpts = {}
-    for i, key in ipairs(keyList) do
-        if optionDefsByKey[key] ~= nil then
-            table.insert(randomizableOpts, optionDefsByKey[key])
-        end
+    if kind == 'all' then
+        randomizableOpts = {musicOpt, bgOpt, tilesetOpt}
+    elseif kind == 'music+bg' then
+        randomizableOpts = {musicOpt, bgOpt}
+    elseif  kind == 'music' then
+        randomizableOpts = {musicOpt}
+    elseif kind == 'background' or kind == 'bg' then
+        randomizableOpts = {bgOpt}
+    elseif kind == 'tileset' then
+        randomizableOpts = {tilesetOpt}
+    elseif kind == 'tileset+bg' then
+        randomizableOpts = {tilesetOpt, bgOpt}
+    else
+        return
     end
-    if #randomizableOpts == 0 then return end
 
     for i, opt in ipairs(randomizableOpts) do
         local vals = opt.values
@@ -483,12 +542,19 @@ function Options:randomize(keyList)
             local favList = self.userOptions[opt.favKey]
             newIdx = favList[math.random(1, #favList)]
         else
-            newIdx = math.random(1, #vals)
+            if opt.key == 'music' then
+                newIdx = math.random(3, #vals)
+            else
+                newIdx = math.random(1, #vals)
+            end
         end
+
+        -- only return a random item (used in music player to get random bg images)
+        if dontSave then return newIdx end
 
         self.userOptions[opt.key] = {newIdx}
         if opt.dirtyRead then
-            self.userOptions[opt.key][2] = (newIdx ~= currentIdx)
+            self.userOptions[opt.key][2] = (newIdx ~= currentIdx) or opt.key == 'music'
         end
 
         opt.current = newIdx
@@ -497,21 +563,22 @@ function Options:randomize(keyList)
     self:updateImage()
 end
 
-function Options:getFavorites(key)
-    local opt = optionDefsByKey[key]
-    if opt.favKey then
-        local favs = self.userOptions[opt.favKey]
-        return favs
+function Options:getMusicFavorites()
+    local favs = self.userOptions['musicFavorites']
+    if #favs == 0 then return nil end
+    table.shuffle(favs)
+    local playlistFavs = {}
+    for i, fav in ipairs(favs) do
+        if fav > 2 then
+            table.insert(playlistFavs, fav - 2)
+        end
     end
-    return {}
+    return playlistFavs
 end
 
-function Options:handleAPress()
+function Options:toggleFavorite()
     local option = self:getSelectedOption()
     -- toggle the option if can't be favorited
-    if option.key == RESET then
-        return self:resetToDefaults()
-    end
     if not option.favKey then
         return self:toggleCurrentOption(1, true)
     end
@@ -524,22 +591,20 @@ function Options:handleAPress()
             if fav ~= option.current then table.insert(newFavs, fav) end
         end
         self.userOptions[option.favKey] = newFavs
+        print('removed favorite')
     else -- add favorite
         table.insert(favList, option.current)
+        print('marked favorite')
     end
+    printTable(self.userOptions[option.favKey])
     self:updateImage()
-end
 
-function Options:resetToDefaults()
-    self:playResetSFX()
-    self:userOptionsInit(true)
-    self:updateImage()
 end
 
 function Options:toggleCurrentOption(incr, forceWrap)
     incr = incr or 1
-    self:resetKeyTimers(true)
-    self:playSelectionSFX(incr == 1)
+    self:resetKeyTimers()
+    SFX:play(incr == -1 and SFX.kSelectionReverse or SFX.kSelection, true)
 
     local option = self:getSelectedOption()
     local key =  option.key
@@ -605,14 +670,17 @@ function Options:updateImage()
     local img = self:getImage()
     img:clear(gfx.kColorClear)
     gfx.pushContext(img)
-
-    if not self.previewMode then
+    gfx.setFont(ST_DIN, 'normal')
+    gfx.setFont(ST_DIN_BOLD, 'bold')
+    if self.slideAnim then
+        local value = self.slideAnim.currentStage.value
+        self:drawSideBar(value)
+        self:drawMenu(value)
+    elseif not self.previewMode then
 
         self:updateMenuImage()
-        self:drawSideBar()
-
-        -- xoffset is a parameter for this methods in case you want to animate the drawing left or right
-        self:drawMenu(0)
+        self:drawSideBar(w)
+        self:drawMenu(w)
 
         local tooltip = self:getSelectedOption().tooltip
         if tooltip then
@@ -620,7 +688,7 @@ function Options:updateImage()
         end
     else
         self:updateMenuImage()
-        self:drawMenu(0)
+        self:drawMenu(w)
     end
 
     gfx.popContext()
@@ -634,26 +702,25 @@ function Options:updateMenuImage()
     gfx.popContext()
 end
 
-function Options:drawSideBar()
+function Options:drawSideBar(width)
     gfx.setColor(gfx.kColorWhite)
-    gfx.fillRect(X_OFFSET, 0, w, 240)
+    gfx.fillRect(0, 0, width, 240)
     gfx.setColor(gfx.kColorBlack)
-    gfx.setLineWidth(2)
-    gfx.drawLine(w,0,w,240)
+    gfx.setDitherPattern(0.5, gfx.image.kDitherTypeBayer2x2)
+    gfx.fillRect(width,0,5,240)
+    gfx.setColor(gfx.kColorBlack)
+    gfx.setLineWidth(1)
+    gfx.drawLine(width,0,width,240)
 end
 
-function Options:drawMenu(xoffset)
-    local menuXOffset = xoffset + X_OFFSET
+function Options:drawMenu(width)
+    local menuXOffset = -w + width
     self.menuImg:draw(menuXOffset, 0)
 end
 
 function Options:drawTooltipBox(tooltip)
-    local textPadding = 10
-    local distanceFromDivider = 18
-    local x, y = w + DIVIDER_WIDTH + distanceFromDivider, 20
-    if DISPLAY_ON_RIGHT then
-        x = distanceFromDivider
-    end
+    local textPadding = 5
+    local x, y = w + dividerWidth + 18, 30
     local maxWidth = 160
     local maxHeight = 180
 
@@ -663,7 +730,7 @@ function Options:drawTooltipBox(tooltip)
     self.tooltipImg = gfx.image.new(200, th+40)
     gfx.pushContext(self.tooltipImg)
 
-        Options.drawBox(1, 1, textRect.width + 2*textPadding, textRect.height + 2*textPadding, false)
+        Utils.drawBox(0, 0, textRect.width + 2*textPadding, textRect.height + 2*textPadding, true)
         gfx.drawTextInRect(tooltip, textRect, nil, '...', kTextAlignment.left)
 
     gfx.popContext()
@@ -676,7 +743,7 @@ function Options:selectPreviousRow()
     self.menu:selectPreviousRow(true, false, false)
     local sect, row, col = self.menu:getSelection()
     self.menu:scrollCellToCenter(sect, row, col, false)
-    self:playSelectionSFX(false)
+    SFX:play(SFX.kSelectionReverse, true)
     self:updateImage()
 end
 
@@ -685,17 +752,19 @@ function Options:selectNextRow()
     self.menu:selectNextRow(true, false, false)
     local sect, row, col = self.menu:getSelection()
     self.menu:scrollCellToCenter(sect, row, col, false)
-    self:playSelectionSFX(true)
+    SFX:play(SFX.kSelection, true)
     self:updateImage()
 end
 
-------------------------------------------
---------- STATIC DRAWING METHODS ---------
-------------------------------------------
-
+function Options:restoreZoom()
+    if (self.zoomedIn and Opts:read('maintainzoom')) or Opts:read('zoomfn') == ZOOM_ALWAYS then
+        pd.display.setScale(2)
+        pd.graphics.sprite.addDirtyRect(0, 0, 400, 240)
+    end
+end
+--------- STATIC METHODS ---------
 function Options.drawSwitch(y, val, selected)
-    local x = 158
-
+    local x <const> = 158
     local y <const> = y+8
 
     local r <const> = 6
@@ -731,28 +800,18 @@ function Options.drawSwitch(y, val, selected)
     gfx.popContext()
 end
 
-function Options.drawSlider(y, rawVal, selected, numValues, minVal, showValue)
-    -- rawVal: integer between min and max in the definition (inclusive)
-    -- numValues: how many possible values (max - min + 1)
-    -- minVal: minimum end of the range
-
-    local rightEdge = 190
-
+function Options.drawSlider(y, val, selected)
+    local x <const> = 113
     local y <const> = y+8
 
     local r <const> = 6
-    local rw <const> = numValues * 5 + 12
-    local rx <const> = rightEdge - rw
+    local rx <const> = x+9
     local ry <const> = y-5
+    local rw <const> = 69
     local rh <const> = r*2+2
 
-    -- adjust val to be between 1 and numValues
-    val = rawVal + (1 - minVal)
-    if showValue then
-        gfx.drawTextAligned(rawVal, rx - 5, ry-1, kTextAlignment.right)
-    end
-    local cx <const> = rx
-    local cxv <const> = cx+(val*5)-1
+    local cx <const> = x+11
+    local cxv <const> = cx+(val*5)
     local cy <const> = y-6
 
     gfx.pushContext()
@@ -767,8 +826,8 @@ function Options.drawSlider(y, rawVal, selected, numValues, minVal, showValue)
         gfx.drawRoundRect(rx,ry,rw,rh, r)
 
         -- notches
-        for dot=1,numValues do
-            gfx.fillRect(cx+3+(dot*5),cy+7,2,2)
+        for dot=1,12 do
+            gfx.fillRect(cx-1+(dot*5),cy+7,2,2)
         end
 
         -- handle
@@ -781,44 +840,3 @@ function Options.drawSlider(y, rawVal, selected, numValues, minVal, showValue)
 
     gfx.popContext()
 end
-
-function Options.drawBox(x, y, width, height, drawShadow)
-
-    local rect = pd.geometry.rect.new(x, y, width, height)
-    local shadow = pd.geometry.rect.new(rect.x, rect.y, rect.width+ 5, rect.height + 5)
-
-    if drawShadow then
-        -- shadow
-        gfx.setColor(gfx.kColorBlack)
-        gfx.setDitherPattern(0.5, gfx.image.kDitherTypeBayer2x2)
-        gfx.fillRect(shadow)
-    end
-
-     -- background
-     gfx.setColor(gfx.kColorWhite)
-     gfx.fillRoundRect(rect, 4)
-
-     -- border
-     gfx.setColor(gfx.kColorBlack)
-     gfx.setLineWidth(2)
-     gfx.drawRoundRect(rect, 4)
-
-    return drawShadow and shadow or rect
-end
-
-------------------------------------------
--------- SOUND EFFECT PLACEHOLDERS -------
-------------------------------------------
-
--- open the menu
-function Options:playOpenSFX() end
-
--- close the menu
-function Options:playCloseSFX() end
-
--- reset to defaults
-function Options:playResetSFX() end
-
--- select item
--- pass boolean true for forward selection, boolean false for reverse selection
-function Options:playSelectionSFX(isForward) end
