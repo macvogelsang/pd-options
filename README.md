@@ -1,4 +1,5 @@
 # Playdate Portable Options
+[![Toybox Powered](https://img.shields.io/badge/toybox.py-powered-orange)](https://toyboxpy.io)
 
 A simple to use and portable options class for the Playdate Lua SDK.
 
@@ -27,7 +28,7 @@ A simple to use and portable options class for the Playdate Lua SDK.
 2. Make sure all toyboxes are imported in your code: `import '../toyboxes/toyboxes.lua`
 
 ### Regardless of option above, initialize the class:
-1. Initialize the Options class a global variable. EX: `Opts = Options()`
+1. Initialize the Options class as a global variable. EX: `Opts = Options()`
 2. Ensure `gfx.sprite.update()` and `playdate.timer.updateTimers()` are called in your main update loop.
 3. Done!
 
