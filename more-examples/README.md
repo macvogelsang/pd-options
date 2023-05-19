@@ -1,4 +1,4 @@
-# More Examples
+# Options class in the wild
 This folder contains some additional (modified) examples of this options class in released Playdate games.
 Currently the following games are using the class:
 - [Sparrow Solitaire](https://sparrowsolitaire.com) | The exact code for Sparrow Solitaire's option class is here in this repo, but has many other dependencies that are not included. Worth checking out if you want to see how we did some of the custom styles or slide-in/out animations.

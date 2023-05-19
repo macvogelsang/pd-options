@@ -12,18 +12,6 @@ local gfx <const> = pd.graphics
 
 class('Options').extends(gfx.sprite)
 
--- You can change this stuff
--- Option selection key repeat values
-local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
-local UP_DOWN_KEY_REPEAT_INITIAL = 250 -- initial delay before key repeating starts
--- Value selection key repeat values (these are slower by default because some value changing operations can be expensive)
-local LEFT_RIGHT_KEY_REPEAT = 150
-local LEFT_RIGHT_KEY_REPEAT_INITIAL = 250
--- Set to true to display the options on the right side of the screen instead
-local DISPLAY_ON_RIGHT = false
--- File path of the output user settings in game data folder
-local SAVED_DATA_PATH = 'settings'
-
 
 -- Probably no need to change this stuff unless you want more custom drawing styles
 local timer <const> = pd.timer
@@ -31,48 +19,36 @@ local w <const> = 200	--198
 local h <const> = 240
 local DIVIDER_WIDTH <const> = 1
 local ITEM_HEIGHT <const> = 24
-local X_OFFSET = DISPLAY_ON_RIGHT and 200 or 0
-local TOGGLE, SLIDER, RESET = 1, 2, 'RESET'
+Options.TOGGLE, Options.SLIDER, Options.RESET = 1, 2, 'RESET'
+TOGGLE, SLIDER, RESET = Options.TOGGLE, Options.SLIDER, Options.RESET
 local TOGGLE_VALS = {false, true}
-
--- Define the list of options declaratively. Each option must fall within a section header.
--- See README.md for details on fields.
-local optionDefinitions = {
-    {
-        header = 'Options Demo',
-        options = {
-            -- Standard list style options.
-            {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
-            {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the menu when changed for a better look at the scene behind it', canFavorite=true},
-            -- Toggle switch option. No values necessary. This option also locks the Background option.
-            {name='Outlined', style=TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
-            -- Slider option examples. No values are supplied, instead pass a min and max. Must use ints and the range is inclusive. No limit on size of range but visually it may look weird at 20 or more values.
-            -- If you want to select between a lot of numbers, want a greater than 1 step size, or want float values, use a list option instead.
-            -- The default in this case is NOT an index like in all other styles. Instead it is a value within the range.
-            {name='X offset', key='xOffset', min=-2, max=2, default=0, style=SLIDER, dirtyRead=true, showValue=true},
-            {name='Y offset', key='yOffset', min=0, max=10, default=0, style=SLIDER, dirtyRead=true, showValue=true},
-            -- Example of reset button. Name can be whatever but key must be "RESET"
-            {name='Reset to defaults', key='RESET'}
-        }
-    }
-}
-
-local musicOpt = optionDefinitions[1].options[1]
-local bgOpt =  optionDefinitions[1].options[1]
-local tilesetOpt = optionDefinitions[1].options[1]
+-- Option selection key repeat values
+local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
+local UP_DOWN_KEY_REPEAT_INITIAL = 250 -- initial delay before key repeating starts
+-- Value selection key repeat values (these are slower by default because some value changing operations can be expensive)
+local LEFT_RIGHT_KEY_REPEAT = 150
+local LEFT_RIGHT_KEY_REPEAT_INITIAL = 250
 
 local lockRelations = {} -- store for options that lock other options
 local lockedOptions = {} -- hash set of option keys that are currently locked from being altered
 local optionDefsByKey = {} -- transformation of the optionDefinitions object to be indexed by key. values point back to the option definition
 
-function Options:init()
+-- Initialize the Options class with three parameters:
+-- definitions: Define the list of options declaratively. Each option must fall within a section header. See readme for details
+-- displayOnRight: set to true to show the options on the right side of the screen instead of left
+-- saveDataPath:  File path of the output user settings in game data folder (don't include .json)
+function Options:init(definitions, displayOnRight, saveDataPath)
     Options.super.init(self)
+    assert(definitions, "Must supply an options definition object")
+    self.displayOnRight = displayOnRight
+    self.saveDataPath = saveDataPath or 'settings'
+    self.xOffset = self.displayOnRight and 200 or 0
 
     self.frame = 1
     self.menu = pd.ui.gridview.new(0, ITEM_HEIGHT)
 
     -- list of available options based on option screen (indexed by section/row for easy selection)
-    self.currentOptions = {}
+    self.currentOptions = definitions
     -- current values for each option. (indexed by key for easy reads)
     self.userOptions = {}
     self.dirty = false
@@ -191,8 +167,6 @@ function Options:init()
 end
 
 function Options:menuInit()
-    self.currentOptions = optionDefinitions
-
     local sectionRows = {}
     local startRow = 0
     for i, section in ipairs(self.currentOptions) do
@@ -218,7 +192,7 @@ function Options:userOptionsInit(ignoreUserOptions)
     self.userOptions = {}
 
     -- Go through each defined option and see if an existing value was loaded
-    for j, section in ipairs(optionDefinitions) do
+    for j, section in ipairs(self.currentOptions) do
         for i, option in ipairs(section.options) do
             local key = option.key or option.name:lower()
             optionDefsByKey[key] = option
@@ -318,11 +292,11 @@ end
 
 function Options:saveUserOptions()
     self.userOptions._build = pd.metadata.buildNumber
-    pd.datastore.write(self.userOptions, path or SAVE_DATA_PATH, false)
+    pd.datastore.write(self.userOptions, self.saveDataPath, false)
 end
 
 function Options:loadUserOptions()
-    return pd.datastore.read(SAVE_DATA_PATH)
+    return pd.datastore.read(self.saveDataPath)
 end
 
 function Options:resetKeyTimers(upDownOnly)
@@ -640,14 +614,14 @@ end
 
 function Options:drawSideBar()
     gfx.setColor(gfx.kColorWhite)
-    gfx.fillRect(X_OFFSET, 0, w, 240)
+    gfx.fillRect(self.xOffset, 0, w, 240)
     gfx.setColor(gfx.kColorBlack)
     gfx.setLineWidth(2)
     gfx.drawLine(w,0,w,240)
 end
 
 function Options:drawMenu(xoffset)
-    local menuXOffset = xoffset + X_OFFSET
+    local menuXOffset = xoffset + self.xOffset
     self.menuImg:draw(menuXOffset, 0)
 end
 
@@ -655,7 +629,7 @@ function Options:drawTooltipBox(tooltip)
     local textPadding = 10
     local distanceFromDivider = 18
     local x, y = w + DIVIDER_WIDTH + distanceFromDivider, 20
-    if DISPLAY_ON_RIGHT then
+    if self.displayOnRight then
         x = distanceFromDivider
     end
     local maxWidth = 160

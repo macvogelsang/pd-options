@@ -1,7 +1,7 @@
 # Playdate Portable Options
 [![Toybox Powered](https://img.shields.io/badge/toybox.py-powered-orange)](https://toyboxpy.io)
 
-A simple to use and portable options class for the Playdate Lua SDK.
+A simple to use and portable options class for the Playdate Lua SDK. It has no dependencies outside the Corelibs and the UI design is based on the Playdate system menu.
 
 ![Screenshot of options menu](more-examples/screen.png)
 ![Demo gif of options menu](more-examples/demo.gif)
@@ -12,7 +12,7 @@ A simple to use and portable options class for the Playdate Lua SDK.
 - List, toggle, and slider option styles
 - Automatic saving and loading of user settings
 - Dirty read support (any Option:read() can be configured to return `nil` when value hasn't changed)
-- Can to lock some options from being changed given a value of another option
+- Can lock options from being changed given a value of another option
 - Ability to favorite the values of certain options to use how you wish
 - Optional "Reset to defaults" button
 - Placeholder methods for your own sound effects
@@ -28,7 +28,7 @@ A simple to use and portable options class for the Playdate Lua SDK.
 2. Make sure all toyboxes are imported in your code: `import '../toyboxes/toyboxes.lua'`
 
 ### Regardless of option above, initialize the class:
-1. Initialize the Options class as a global variable. EX: `Opts = Options()`
+1. Initialize the Options class as a global variable. EX: `Opts = Options(...)` (see below for details)
 2. Ensure `gfx.sprite.update()` and `playdate.timer.updateTimers()` are called in your main update loop.
 3. Done!
 
@@ -38,8 +38,17 @@ Compile and build this project as a PDX to try an example app which demos all of
 
 ## Usage
 
+Initialize the class as a global variable. `Opts = Options(definitions, displayOnRight, saveDataPath)`. The params are detailed here:
+- **definitions** (required `table`): A table that specifies each option and the sections they live in. See the next section for details.
+- **displayOnRight** (optional `boolean`): If `true`, the menu will draw on the right half of the screen instead of left.
+- **saveDataPath** (optional `string`): By default, the class saves user settings to `settings.json` in the game's Data directory. Pass a different string here to override that.
+
+The Options menu extends the `playdate.graphics.sprite` class. If you wish to change the zIndex (defaulted to 9999) or the drawOffset, or any other standard sprite property, that's possible with normal sprite methods after initialization.
+
+Ensure that `gfx.sprite.update()`  is called in the main update loop. You will also need `playdate.timer.updateTimers()` if you want key repeat timers to work.
+
 ### Defining the options
-All of your game's options can be defined declaratively by editing the `optionDefinitions` variable on Line 60 of Options.lua. This definition table is a list of sections, and each section contains a header and list of options as follows:
+All of your game's options must be defined declaratively by passing an option definition object to the Options() initialization. This definition table is a list of sections, and each section contains a header and list of options as follows:
 ```lua
 {
     { header="section 1", options = {{name="opt1" ..}, {name="opt2"}, ...}},
@@ -49,16 +58,16 @@ All of your game's options can be defined declaratively by editing the `optionDe
 
 You must have at least one section, and a section can contain any number of options.
 
-An option definition object can have the following properties (see the `Options.lua` class or build the main.lua demo for examples):
+An option definition object can have the following properties (see the `main.lua` class for an example):
 - **name** (required `string`): The option's display name in menu
 - **key** (optional `string`): Identifier for the option in the userOptions table json output (NEEDS TO BE UNIQUE)
     - If key is not provided, lowercase name is used as the key
-    - Set the key to `"RESET"` to make a "reset to defaults" button
+    - Set the key to `Options.RESET` to make a "reset to defaults" button
 - **values** (optional `table`): Table of possible values. Only required for normal "List" style options.
-- **style** (optional enum: `TOGGLE`, `SLIDER`, or none): Defines a special type of option. If omitted, this will be a normal "list" option.
+- **style** (optional enum: `Options.TOGGLE`, `Options.SLIDER`, or none): Defines a special type of option. If omitted, this will be a normal "list" option.
     - For any of these special option types, the `values` field is not required as it is calculated automatically.
-    - `TOGGLE`: Boolean toggle switch. Values: `{false, true}`
-    - `SLIDER`: Used to select an integer in a range from min to max (useful for volume controls). Values: {min, ... , max}
+    - `Options.TOGGLE`: Boolean toggle switch. Values: `{false, true}`
+    - `Options.SLIDER`: Used to select an integer in a range from min to max (useful for volume controls). Values: {min, ... , max}
 - **min** (required for `SLIDER`, `integer`): Integer minimum value for the slider. can be negative.
 - **max** (required for `SLIDER`, `integer`): Integer maximum value for the slider. can be negative. Should probably be greater than the min or bad things might happen (haven't tested this)
 - **default** (optional `integer`): Index of the value that should be set as default. If omitted, the first item in the values list will be the default.
@@ -98,13 +107,13 @@ The easiest way to use this class is to initialize it as a global variable (see 
     - `listOfKeys` (table of strings): Option keys to randomize. If any of these options have favorites selected, only those favorites are selected from in the randomizer.
 - `Options:getFavorites(key)`: Retrieve a list of a indexes of option values that have been marked as favorite for the given option.
     - `key` (string): The desired option key to retrieve favorites from.
-- `Options:saveUserOptions()`: Save current user settings to the game's data folder. You can change the default path by changing the `SAVE_DATA_PATH` constant in `Options.lua`.
+- `Options:saveUserOptions()`: Save current user settings to the game's data folder. You can change the default path by supplying a `saveDataPath` parameter on initialization.
 - `Options:isOptsDirty()`: returns `true` if any single option in the whole options class has been changed.
 - `Options:markClean()`: Marks the options menu as a whole as clean (*this does not alter the individual dirty flags for dirtyRead options!!*).
 
 ### State Saving and Loading
 
-The option class automatically writes the user settings to a file called `settings.json` in the game's Data folder. You can change this path by changing the `SAVE_DATA_PATH` constant in Options.lua.
+The option class automatically writes the user settings to a file called `settings.json` in the game's Data folder. You can change this path by passing the `saveDataPath` param in initialization.
 
 Saving will happen automatically when the options menu is hidden, but you might also want to save this data at other points such as when the app is about to terminate. To do that, add something like the following to your main.lua:
 

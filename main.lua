@@ -2,9 +2,29 @@ local pd <const> = playdate
 local gfx <const> = pd.graphics
 pd.display.setRefreshRate(30)
 
--- Import and initialize a global Options class -----
+-- Import and initialize the global Options class -----
 import 'options'
-Opts = Options()
+local defs = {
+    {
+        header = 'Options Demo',
+        options = {
+            -- Standard list style options.
+            {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
+            {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the menu when changed for a better look at the scene behind it', canFavorite=true},
+            -- Toggle switch option. No values necessary. This option also locks the Background option.
+            {name='Outlined', style=Options.TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
+            -- Slider option examples. No values are supplied, instead pass a min and max. Must use ints and the range is inclusive. No limit on size of range but visually it may look weird at 20 or more values.
+            -- If you want to select between a lot of numbers, want a greater than 1 step size, or want float values, use a list option instead.
+            -- The default in this case is NOT an index like in all other styles. Instead it is a value within the range.
+            {name='X offset', key='xOffset', min=-2, max=2, default=0, style=Options.SLIDER, dirtyRead=true, showValue=true},
+            {name='Y offset', key='yOffset', min=0, max=10, default=0, style=Options.SLIDER, dirtyRead=true, showValue=true},
+            -- Example of reset button. Name can be whatever but key must be "RESET"
+            {name='Reset to defaults', key='RESET'}
+        }
+    }
+}
+
+Opts = Options(defs)
 ----------------------------------------------
 
 -- Setup variables for the test app, can ignore this stuff ------
