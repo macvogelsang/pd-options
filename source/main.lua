@@ -24,7 +24,7 @@ local defs = {
     }
 }
 
-Opts = Options(defs)
+Opts = Options(defs, true)
 ----------------------------------------------
 
 -- Setup variables for the test app, can ignore this stuff ------

@@ -1,9 +1,9 @@
 # Playdate Portable Options
-[![Toybox Powered](https://img.shields.io/badge/toybox.py-powered-orange)](https://toyboxpy.io)
+[![Toybox Compatible](https://img.shields.io/badge/toybox.py-compatible-brightgreen)](https://toyboxpy.io)
 
 A simple to use and portable options class for the Playdate Lua SDK. It has no dependencies outside the Corelibs and the UI design is based on the Playdate system menu.
 
-![Screenshot of options menu](more-examples/screen.png)
+![Demo of options in system menu](more-examples/demo2.gif)
 ![Demo gif of options menu](more-examples/demo.gif)
 
 ## Features
@@ -24,7 +24,7 @@ A simple to use and portable options class for the Playdate Lua SDK. It has no d
 2. `import 'path/to/options'` in your `main.lua` file
 
 ### Option B: With [toybox](https://github.com/DidierMalenfant/toybox.py)
-1. Run `toybox add https://github.com/macvogelsang/pd-options` and `toybox update`
+1. Run `toybox add options` and `toybox update`
 2. Make sure all toyboxes are imported in your code: `import '../toyboxes/toyboxes.lua'`
 
 ### Regardless of option above, initialize the class:
@@ -45,7 +45,7 @@ Initialize the class as a global variable. `Opts = Options(definitions, displayO
 
 The Options menu extends the `playdate.graphics.sprite` class. If you wish to change the zIndex (defaulted to 9999) or the drawOffset, or any other standard sprite property, that's possible with normal sprite methods after initialization.
 
-Ensure that `gfx.sprite.update()`  is called in the main update loop. You will also need `playdate.timer.updateTimers()` if you want key repeat timers to work.
+Ensure that `playdate.graphics.sprite.update()`  is called in the main update loop. You will also need `playdate.timer.updateTimers()` if you want key repeat timers to work.
 
 ### Defining the options
 All of your game's options must be defined declaratively by passing an option definition object to the Options() initialization. This definition table is a list of sections, and each section contains a header and list of options as follows:
@@ -67,7 +67,7 @@ An option definition object can have the following properties (see the `main.lua
 - **style** (optional enum: `Options.TOGGLE`, `Options.SLIDER`, or none): Defines a special type of option. If omitted, this will be a normal "list" option.
     - For any of these special option types, the `values` field is not required as it is calculated automatically.
     - `Options.TOGGLE`: Boolean toggle switch. Values: `{false, true}`
-    - `Options.SLIDER`: Used to select an integer in a range from min to max (useful for volume controls). Values: {min, ... , max}
+    - `Options.SLIDER`: Used to select an integer in a range from min to max (useful for volume controls). Values: `{min, min+1, min+2, ... , max}`
 - **min** (required for `SLIDER`, `integer`): Integer minimum value for the slider. can be negative.
 - **max** (required for `SLIDER`, `integer`): Integer maximum value for the slider. can be negative. Should probably be greater than the min or bad things might happen (haven't tested this)
 - **default** (optional `integer`): Index of the value that should be set as default. If omitted, the first item in the values list will be the default.
@@ -101,7 +101,7 @@ The easiest way to use this class is to initialize it as a global variable (see 
         `if Opts:read('color') == 2`. If you later want to change the string 'green' to 'dark green' you can simply change the string in the options definition but the code where you check the value remains the same. Alternatively, you could do `if Opts:read('color', false, true) == 'green'` if that makes more sense for your use case. In either case, numeric checks are probably faster than string checks, and in the resulting `settings.json` file, a user's selected values are stored as indexes rather than values (except for boolean options).
 - `Options:write(key, newIndex, keepClean)`: Write a new value (in index form) to the given option key. Normally the user should be the one setting option values by using the option menu in-game, but occasionally you may have a case where you want to write new options values in code.
     - `key` (string): Key for the option of interest
-    - `newIndex` (integer): The index of the new value If different from the current value, the option is marked dirty (unless below).
+    - `newIndex` (integer): The index of the new value If different from the current value, the option is marked dirty (unless `keepClean`).
     - `keepClean` (boolean, default `nil`): Skip marking the option as dirty if the new value is different.
 - `Options:randomize(listOfKeys)`: Randomly select (and write) new values for a given list of options keys. For example, this is used in Sparrow Solitaire when going to a new layout, as the current background, tileset, and music options can be randomized.
     - `listOfKeys` (table of strings): Option keys to randomize. If any of these options have favorites selected, only those favorites are selected from in the randomizer.
@@ -141,7 +141,7 @@ Override or modify the following methods for sound effects:
 To change the fonts for option labels or values, the best place to do it would probably be line 106 or 112 inside the `menu.drawCell()` method of Options.lua. To change section heading fonts, check out the draw functions on line 128 `menu.drawSectionHeader()`.
 
 ## Special Thanks
-[Matt Sephton](https://github.com/gingerbeardman) for his original options manager class (since altered way beyond recognition) and for his encouragement in making this useful class open source.
+[Matt Sephton](https://github.com/gingerbeardman) for his original options manager class (since altered beyond recognition), for drawing the switches and slider in code, and for his encouragement in making this useful class open source.
 
 
 

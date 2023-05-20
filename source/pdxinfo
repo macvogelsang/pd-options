@@ -1,6 +1,6 @@
-name=Options
+name=OptionsDemoApp
 author=Mac Vogelsang
 description=Demo Application for Options class
 bundleID=com.vogelscript.options
-version=1.1.0
+version=1.1.1
 buildNumber=0000
