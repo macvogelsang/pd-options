@@ -9,7 +9,7 @@ local defs = {
         header = 'Options Demo',
         options = {
             -- Standard list style options.
-            {name='B button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the B button. Not a dirtyRead option as the value is checked on demand when b is pressed.'},
+            {name='A button', key='bFunction', values={'add circle', 'add square', 'clear all'}, dirtyRead=false, tooltip='Change the function of the A button. Not a dirtyRead option as the value is checked on demand when A is pressed.'},
             {name='Background', key='bg', values={'no bg', 'bayer', 'vertical'}, default=1, preview=true, dirtyRead=true, tooltip='This option hides the menu when changed for a better look at the scene behind it', canFavorite=true},
             -- Toggle switch option. No values necessary. This option also locks the Background option.
             {name='Outlined', style=Options.TOGGLE, default=1, dirtyRead=true, tooltip='Example for a toggle switch. Controls whether the added shapes are outlined or not. Will lock the background setting to "bayer"', locks={lockedOption='bg', lockedValue=2, lockedWhen=true}},
@@ -34,7 +34,7 @@ local shapes = {}
 local SHAPE_MAX_SIZE = 40
 local SHAPE_MID = SHAPE_MAX_SIZE / 2
 
-local textImg = gfx.imageWithText(" Press Ⓐ to open Options, Ⓑ to do function. ", 400, 30, gfx.kColorWhite, nil, nil, kTextAlignment.left)
+local textImg = gfx.imageWithText(" Press Ⓑ to open Options, Ⓐ to do function. ", 400, 30, gfx.kColorWhite, nil, nil, kTextAlignment.left)
 local textSprite = gfx.sprite.new(textImg)
 textSprite:moveTo(10, 210)
 textSprite:setCenter(0,0)
@@ -43,16 +43,16 @@ textSprite:add()
 
 -- Controls for the test app. The options class has its own self-contained input handlers which you shouldn't need to worry about.
 local controls = {
-    -- A button to show options
-    AButtonDown = function()
-        Opts:show()
-    end,
     -- Up button to demonstrate "randomizer" method.
     upButtonDown = function()
         Opts:randomize({'bg', 'bFunction'})
     end,
-    -- B button function is flexible depending on current setting
+    -- B button to show options
     BButtonDown = function()
+        Opts:show()
+    end,
+    -- A button function is flexible depending on current setting
+    AButtonDown = function()
         -- Read the outlined status
         -- pass true here to "force" a read, even if the option is not dirty
         local outlined = Opts:read('outlined', true)
