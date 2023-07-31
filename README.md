@@ -38,10 +38,11 @@ Compile and build this project as a PDX to try an example app which demos all of
 
 ## Usage
 
-Initialize the class as a global variable. `Opts = Options(definitions, displayOnRight, saveDataPath)`. The params are detailed here:
+Initialize the class as a global variable. `Opts = Options(definitions, displayOnRight, saveDataPath, onHide)`. The params are detailed here:
 - **definitions** (required `table`): A table that specifies each option and the sections they live in. See the next section for details.
 - **displayOnRight** (optional `boolean`): If `true`, the menu will draw on the right half of the screen instead of left.
 - **saveDataPath** (optional `string`): By default, the class saves user settings to `settings.json` in the game's Data directory. Pass a different string here to override that.
+- **onHide** (optional `function`): Function called after the `:hide()` function is called.
 
 The Options menu extends the `playdate.graphics.sprite` class. If you wish to change the zIndex (defaulted to 9999) or the drawOffset, or any other standard sprite property, that's possible with normal sprite methods after initialization.
 

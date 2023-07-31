@@ -37,7 +37,8 @@ local optionDefsByKey = {} -- transformation of the optionDefinitions object to 
 -- definitions: Define the list of options declaratively. Each option must fall within a section header. See readme for details
 -- displayOnRight: set to true to show the options on the right side of the screen instead of left
 -- saveDataPath:  File path of the output user settings in game data folder (don't include .json)
-function Options:init(definitions, displayOnRight, saveDataPath)
+-- onHide: Function called when the Options menu hides
+function Options:init(definitions, displayOnRight, saveDataPath, onHide)
     Options.super.init(self)
     assert(definitions, "Must supply an options definition object")
     self.displayOnRight = displayOnRight
@@ -53,6 +54,7 @@ function Options:init(definitions, displayOnRight, saveDataPath)
     self.userOptions = {}
     self.dirty = false
     self.previewMode = false
+    self.onHide = onHide
 
     -- sprite init
     self:setZIndex(9999)
@@ -324,6 +326,14 @@ function Options:hide()
     self:resetKeyTimers()
     pd.inputHandlers.pop()
     self:setVisible(false)
+    local callback = self.onHide
+    if callback then
+      	assert(
+          type(callback) == "function",
+          "Tried to call onHide callback but it's not a function"
+        )
+        callback(self)
+    end
 end
 
 -- given an option key and a value, check if that setting should lock any other options from changing
