@@ -386,6 +386,12 @@ function Options:getValue(section, row)
     return option.values[option.current], isFavorited
 end
 
+function Options:setName(text)
+    self.currentOptions[1].options[1].name = text
+    self:updateImage()
+end
+
+
 -- Returns the index of the option's value if it is marked as dirty, otherwise return nil
 -- Pass ignoreDirty=true to always read the value of the option
 -- Pass returnValue=true to return the actual value instead of the index
