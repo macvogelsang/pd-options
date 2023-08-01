@@ -612,6 +612,7 @@ function Options:updateImage()
         end
     else
         self:updateMenuImage()
+        self:drawShadow(0)
         self:drawMenu(0)
     end
 
@@ -639,6 +640,15 @@ function Options:drawMenu(xoffset)
     self.menuImg:draw(menuXOffset, 0)
 end
 
+function Options:drawShadow(xoffset)
+    local menuXOffset = xoffset + self.xOffset
+
+    gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+    self.menuImg:draw(menuXOffset+2, 0+2)
+    gfx.setImageDrawMode(gfx.kDrawModeCopy)
+
+    local shadow = self.menuImg:fadedImage(0.5, gfx.image.kDitherTypeBayer8x8)
+    shadow:draw(menuXOffset+2, 0+2)
 end
 
 function Options:drawTooltipBox(tooltip)
