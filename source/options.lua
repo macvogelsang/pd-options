@@ -19,8 +19,8 @@ local w <const> = 200	--198
 local h <const> = 240
 local DIVIDER_WIDTH <const> = 1
 local ITEM_HEIGHT <const> = 24
-Options.TOGGLE, Options.SLIDER, Options.RESET = 1, 2, 'RESET'
-TOGGLE, SLIDER, RESET = Options.TOGGLE, Options.SLIDER, Options.RESET
+Options.TOGGLE, Options.SLIDER, Options.BUTTON, Options.RESET = 1, 2, 'BUTTON', 'RESET'
+TOGGLE, SLIDER, BUTTON, RESET = Options.TOGGLE, Options.SLIDER, Options.BUTTON, Options.RESET
 local TOGGLE_VALS = {false, true}
 -- Option selection key repeat values
 local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
@@ -94,7 +94,7 @@ function Options:init(definitions, displayOnRight, saveDataPath)
                 Options.drawSwitch(y+textPadding-2, val, selected)
             elseif style == SLIDER then
                 Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal, showValue)
-            elseif style ~= RESET then
+            elseif style ~= RESET and style ~= BUTTON then
                 -- draw value as text
                 local optionWidth = w - 8 - (labelWidth+textPadding)
                 if isFavorited then val = '❤️*' .. val else val = '*' .. val end
@@ -205,6 +205,9 @@ function Options:userOptionsInit(ignoreUserOptions)
             if option.key == RESET then
                 option.values = {1}
                 option.style = RESET
+            end
+            if option.style == BUTTON then
+                option.values = key
             end
             if option.style == SLIDER then
                 option.values = {}
@@ -489,6 +492,9 @@ function Options:handleAPress()
     -- toggle the option if can't be favorited
     if option.key == RESET then
         return self:resetToDefaults()
+    end
+    if option.style == BUTTON then
+        return self:hide()
     end
     if not option.favKey then
         return self:toggleCurrentOption(1, true)
