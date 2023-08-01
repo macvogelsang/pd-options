@@ -177,7 +177,11 @@ function Options:menuInit()
 
     self.menu:setCellPadding(0,0,2,2)
     self.menu:setContentInset(4, 4, 0, 0)
-    self.menu:setSectionHeaderHeight(ITEM_HEIGHT)
+    if self.currentOptions[1].header ~= "" then
+        self.menu:setSectionHeaderHeight(ITEM_HEIGHT)
+    else
+        self.menu:setSectionHeaderHeight(0)
+    end
     self.menu:setSectionHeaderPadding(0, 0, 2, 0)
 
     self.menu:setNumberOfRows(table.unpack(sectionRows))
