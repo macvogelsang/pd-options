@@ -42,7 +42,7 @@ function Options:init(definitions, displayOnRight, saveDataPath)
     assert(definitions, "Must supply an options definition object")
     self.displayOnRight = displayOnRight
     self.saveDataPath = saveDataPath or 'settings'
-    self.xOffset = self.displayOnRight and 200 or 0
+    self.xOffset = self.displayOnRight and w or 0
 
     self.frame = 1
     self.menu = pd.ui.gridview.new(0, ITEM_HEIGHT)
@@ -96,7 +96,7 @@ function Options:init(definitions, displayOnRight, saveDataPath)
                 Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal, showValue)
             elseif style ~= RESET then
                 -- draw value as text
-                local optionWidth = 192 - (labelWidth+textPadding)
+                local optionWidth = w - 8 - (labelWidth+textPadding)
                 if isFavorited then val = '❤️*' .. val else val = '*' .. val end
                 gfx.drawTextInRect(val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
             end
@@ -617,7 +617,7 @@ function Options:drawSideBar()
     gfx.fillRect(self.xOffset, 0, w, 240)
     gfx.setColor(gfx.kColorBlack)
     gfx.setLineWidth(2)
-    gfx.drawLine(w,0,w,240)
+    gfx.drawLine(w+1,0,w+1,240)
 end
 
 function Options:drawMenu(xoffset)
@@ -632,13 +632,13 @@ function Options:drawTooltipBox(tooltip)
     if self.displayOnRight then
         x = distanceFromDivider
     end
-    local maxWidth = 160
+    local maxWidth = w-40
     local maxHeight = 180
 
     local tw, th = gfx.getTextSizeForMaxWidth(tooltip, maxWidth - 2*textPadding)
     local textRect = pd.geometry.rect.new(textPadding, textPadding, maxWidth - 2*textPadding, th)
 
-    self.tooltipImg = gfx.image.new(200, th+40)
+    self.tooltipImg = gfx.image.new(w, th+40)
     gfx.pushContext(self.tooltipImg)
 
         Options.drawBox(1, 1, textRect.width + 2*textPadding, textRect.height + 2*textPadding, false)
@@ -672,7 +672,7 @@ end
 ------------------------------------------
 
 function Options.drawSwitch(y, val, selected)
-    local x = 158
+    local x = w - 42
 
     local y <const> = y+8
 
@@ -714,7 +714,7 @@ function Options.drawSlider(y, rawVal, selected, numValues, minVal, showValue)
     -- numValues: how many possible values (max - min + 1)
     -- minVal: minimum end of the range
 
-    local rightEdge = 190
+    local rightEdge = w-10
 
     local y <const> = y+8
 
