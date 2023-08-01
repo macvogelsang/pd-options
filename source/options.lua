@@ -299,11 +299,15 @@ end
 
 function Options:saveUserOptions()
     self.userOptions._build = pd.metadata.buildNumber
-    pd.datastore.write(self.userOptions, self.saveDataPath, false)
+    if self.saveDataPath ~= nil then
+        pd.datastore.write(self.userOptions, self.saveDataPath, false)
+    end
 end
 
 function Options:loadUserOptions()
-    return pd.datastore.read(self.saveDataPath)
+    if self.saveDataPath ~= nil then
+        return pd.datastore.read(self.saveDataPath)
+    end
 end
 
 function Options:resetKeyTimers(upDownOnly)
@@ -633,6 +637,8 @@ end
 function Options:drawMenu(xoffset)
     local menuXOffset = xoffset + self.xOffset
     self.menuImg:draw(menuXOffset, 0)
+end
+
 end
 
 function Options:drawTooltipBox(tooltip)
