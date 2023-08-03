@@ -19,8 +19,8 @@ local w <const> = 200	--198
 local h <const> = 240
 local DIVIDER_WIDTH <const> = 1
 local ITEM_HEIGHT <const> = 24
-Options.TOGGLE, Options.SLIDER, Options.RESET = 1, 2, 'RESET'
-TOGGLE, SLIDER, RESET = Options.TOGGLE, Options.SLIDER, Options.RESET
+Options.TOGGLE, Options.SLIDER, Options.BUTTON, Options.RESET = 1, 2, 'BUTTON', 'RESET'
+TOGGLE, SLIDER, BUTTON, RESET = Options.TOGGLE, Options.SLIDER, Options.BUTTON, Options.RESET
 local TOGGLE_VALS = {false, true}
 -- Option selection key repeat values
 local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
@@ -43,7 +43,7 @@ function Options:init(definitions, displayOnRight, saveDataPath, onHide)
     assert(definitions, "Must supply an options definition object")
     self.displayOnRight = displayOnRight
     self.saveDataPath = saveDataPath or 'settings'
-    self.xOffset = self.displayOnRight and 200 or 0
+    self.xOffset = self.displayOnRight and w or 0
 
     self.frame = 1
     self.menu = pd.ui.gridview.new(0, ITEM_HEIGHT)
@@ -96,9 +96,9 @@ function Options:init(definitions, displayOnRight, saveDataPath, onHide)
                 Options.drawSwitch(y+textPadding-2, val, selected)
             elseif style == SLIDER then
                 Options.drawSlider(y+textPadding-2, val, selected, numValues, minVal, showValue)
-            elseif style ~= RESET then
+            elseif style ~= RESET and style ~= BUTTON then
                 -- draw value as text
-                local optionWidth = 192 - (labelWidth+textPadding)
+                local optionWidth = w - 8 - (labelWidth+textPadding)
                 if isFavorited then val = '❤️*' .. val else val = '*' .. val end
                 gfx.drawTextInRect(val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
             end
@@ -179,7 +179,11 @@ function Options:menuInit()
 
     self.menu:setCellPadding(0,0,2,2)
     self.menu:setContentInset(4, 4, 0, 0)
-    self.menu:setSectionHeaderHeight(ITEM_HEIGHT)
+    if self.currentOptions[1].header ~= "" then
+        self.menu:setSectionHeaderHeight(ITEM_HEIGHT)
+    else
+        self.menu:setSectionHeaderHeight(0)
+    end
     self.menu:setSectionHeaderPadding(0, 0, 2, 0)
 
     self.menu:setNumberOfRows(table.unpack(sectionRows))
@@ -207,6 +211,9 @@ function Options:userOptionsInit(ignoreUserOptions)
             if option.key == RESET then
                 option.values = {1}
                 option.style = RESET
+            end
+            if option.style == BUTTON then
+                option.values = key
             end
             if option.style == SLIDER then
                 option.values = {}
@@ -294,11 +301,15 @@ end
 
 function Options:saveUserOptions()
     self.userOptions._build = pd.metadata.buildNumber
-    pd.datastore.write(self.userOptions, self.saveDataPath, false)
+    if self.saveDataPath ~= nil then
+        pd.datastore.write(self.userOptions, self.saveDataPath, false)
+    end
 end
 
 function Options:loadUserOptions()
-    return pd.datastore.read(self.saveDataPath)
+    if self.saveDataPath ~= nil then
+        return pd.datastore.read(self.saveDataPath)
+    end
 end
 
 function Options:resetKeyTimers(upDownOnly)
@@ -384,6 +395,12 @@ function Options:getValue(section, row)
     end
     return option.values[option.current], isFavorited
 end
+
+function Options:setName(text)
+    self.currentOptions[1].options[1].name = text
+    self:updateImage()
+end
+
 
 -- Returns the index of the option's value if it is marked as dirty, otherwise return nil
 -- Pass ignoreDirty=true to always read the value of the option
@@ -500,6 +517,9 @@ function Options:handleAPress()
     if option.key == RESET then
         return self:resetToDefaults()
     end
+    if option.style == BUTTON then
+        return self:hide()
+    end
     if not option.favKey then
         return self:toggleCurrentOption(1, true)
     end
@@ -608,6 +628,7 @@ function Options:updateImage()
         end
     else
         self:updateMenuImage()
+        self:drawShadow(0)
         self:drawMenu(0)
     end
 
@@ -627,12 +648,23 @@ function Options:drawSideBar()
     gfx.fillRect(self.xOffset, 0, w, 240)
     gfx.setColor(gfx.kColorBlack)
     gfx.setLineWidth(2)
-    gfx.drawLine(w,0,w,240)
+    gfx.drawLine(w+1,0,w+1,240)
 end
 
 function Options:drawMenu(xoffset)
     local menuXOffset = xoffset + self.xOffset
     self.menuImg:draw(menuXOffset, 0)
+end
+
+function Options:drawShadow(xoffset)
+    local menuXOffset = xoffset + self.xOffset
+
+    gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+    self.menuImg:draw(menuXOffset+2, 0+2)
+    gfx.setImageDrawMode(gfx.kDrawModeCopy)
+
+    local shadow = self.menuImg:fadedImage(0.5, gfx.image.kDitherTypeBayer8x8)
+    shadow:draw(menuXOffset+2, 0+2)
 end
 
 function Options:drawTooltipBox(tooltip)
@@ -642,13 +674,13 @@ function Options:drawTooltipBox(tooltip)
     if self.displayOnRight then
         x = distanceFromDivider
     end
-    local maxWidth = 160
+    local maxWidth = w-40
     local maxHeight = 180
 
     local tw, th = gfx.getTextSizeForMaxWidth(tooltip, maxWidth - 2*textPadding)
     local textRect = pd.geometry.rect.new(textPadding, textPadding, maxWidth - 2*textPadding, th)
 
-    self.tooltipImg = gfx.image.new(200, th+40)
+    self.tooltipImg = gfx.image.new(w, th+40)
     gfx.pushContext(self.tooltipImg)
 
         Options.drawBox(1, 1, textRect.width + 2*textPadding, textRect.height + 2*textPadding, false)
@@ -682,7 +714,7 @@ end
 ------------------------------------------
 
 function Options.drawSwitch(y, val, selected)
-    local x = 158
+    local x = w - 42
 
     local y <const> = y+8
 
@@ -724,7 +756,7 @@ function Options.drawSlider(y, rawVal, selected, numValues, minVal, showValue)
     -- numValues: how many possible values (max - min + 1)
     -- minVal: minimum end of the range
 
-    local rightEdge = 190
+    local rightEdge = w-10
 
     local y <const> = y+8
 
