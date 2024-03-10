@@ -105,7 +105,7 @@ function Options:init(definitions, displayOnRight, saveDataPath, onHide)
         end
         if style == INFO then
             gfx.setImageDrawMode(gfx.kDrawModeCopy)
-            self:getSelectedOption(section, row).default:draw(x+width-24, y+4)
+            self:getSelectedOption(section, row).default:draw(x+width-32, y)
         end
 
         gfx.popContext()
