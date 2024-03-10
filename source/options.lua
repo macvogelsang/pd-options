@@ -19,8 +19,8 @@ local w <const> = 200	--198
 local h <const> = 240
 local DIVIDER_WIDTH <const> = 1
 local ITEM_HEIGHT <const> = 24
-Options.TOGGLE, Options.SLIDER, Options.RESET = 1, 2, 'RESET'
-TOGGLE, SLIDER, RESET = Options.TOGGLE, Options.SLIDER, Options.RESET
+Options.TOGGLE, Options.SLIDER, Options.INFO, Options.RESET = 1, 2, 3, 'RESET'
+TOGGLE, SLIDER, INFO, RESET = Options.TOGGLE, Options.SLIDER, Options.INFO, Options.RESET
 local TOGGLE_VALS = {false, true}
 -- Option selection key repeat values
 local UP_DOWN_KEY_REPEAT = 50 -- time between key repeats when scrolling
@@ -102,6 +102,10 @@ function Options:init(definitions, displayOnRight, saveDataPath, onHide)
                 if isFavorited then val = '❤️*' .. val else val = '*' .. val end
                 gfx.drawTextInRect(val, labelWidth+textPadding, y+textPadding, optionWidth, height, nil, '...', kTextAlignment.right)
             end
+        end
+        if style == INFO then
+            gfx.setImageDrawMode(gfx.kDrawModeCopy)
+            self:getSelectedOption(section, row).default:draw(x+width-32, y)
         end
 
         gfx.popContext()
@@ -221,6 +225,10 @@ function Options:userOptionsInit(ignoreUserOptions)
                     option.defaultAdjusted = true
                 end
             end
+            if option.style == INFO then
+                option.default = option.default
+                option.values = {}
+            end
             if option.locks then
                 lockRelations[key] = option.locks
             end
@@ -328,9 +336,9 @@ function Options:hide()
     self:setVisible(false)
     local callback = self.onHide
     if callback then
-      	assert(
-          type(callback) == "function",
-          "Tried to call onHide callback but it's not a function"
+            assert(
+            type(callback) == "function",
+            "Tried to call onHide callback but it's not a function"
         )
         callback(self)
     end
@@ -525,11 +533,13 @@ function Options:resetToDefaults()
 end
 
 function Options:toggleCurrentOption(incr, forceWrap)
+    local option = self:getSelectedOption()
+    if option.style == INFO then return end
+
     incr = incr or 1
     self:resetKeyTimers(true)
     self:playSelectionSFX(incr == 1)
 
-    local option = self:getSelectedOption()
     local key =  option.key
     local values = option.values
     local currentIdx = option.current  or option.default
