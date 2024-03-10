@@ -533,11 +533,13 @@ function Options:resetToDefaults()
 end
 
 function Options:toggleCurrentOption(incr, forceWrap)
+    local option = self:getSelectedOption()
+    if option.style == INFO then return end
+
     incr = incr or 1
     self:resetKeyTimers(true)
     self:playSelectionSFX(incr == 1)
 
-    local option = self:getSelectedOption()
     local key =  option.key
     local values = option.values
     local currentIdx = option.current  or option.default
