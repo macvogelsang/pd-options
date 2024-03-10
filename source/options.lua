@@ -104,8 +104,8 @@ function Options:init(definitions, displayOnRight, saveDataPath, onHide)
             end
         end
         if style == INFO then
-            local icon = self:getSelectedOption(section, row).default
-            icon:draw(x+width-24, y+4)
+            gfx.setImageDrawMode(gfx.kDrawModeCopy)
+            self:getSelectedOption(section, row).default:draw(x+width-24, y+4)
         end
 
         gfx.popContext()
