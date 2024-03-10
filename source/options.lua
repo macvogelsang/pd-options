@@ -226,7 +226,7 @@ function Options:userOptionsInit(ignoreUserOptions)
                 end
             end
             if option.style == INFO then
-                option.default = gfx.image.new(option.default)
+                option.default = option.default
                 option.values = {}
             end
             if option.locks then
